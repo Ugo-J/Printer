@@ -6,12 +6,12 @@ class printer{
 private:
 
     // define the constants that define the pointer type
-    inline static const int CHAR = 0;
-    inline static const int INTEGER = 1;
-    inline static const int UNSIGNED_INTEGER = 2;
-    inline static const int INT64 = 3;
-    inline static const int UINT64 = 4;
-    inline static const int DOUBLE = 5;
+    inline static constexpr int CHAR = 0;
+    inline static constexpr int INTEGER = 1;
+    inline static constexpr int UNSIGNED_INTEGER = 2;
+    inline static constexpr int INT64 = 3;
+    inline static constexpr int UINT64 = 4;
+    inline static constexpr int DOUBLE = 5;
 
 private:
 
@@ -25,8 +25,8 @@ private:
 
 private:
 
-    inline static const int SIZE_OF_BUFFER = 64 * 1024; // this defines the length of the internal char buffer used for print shifting
-    inline static const int SIZE_OF_POINTER_ARRAY = SIZE_OF_BUFFER/2; // this defines the length of the pointer array - we set it to SIZE_OF_BUFFER/2 so that it is at least long enough to hold the entire contents of the internal buffer without wrapping around, regardless of the data stored in the internal buffer since the smallest discrete data that can be stored in the internal buffer is a char, which is internally terminated with a null byte the highest number of independent data that can be stored in the pointer array is SIZE_OF_BUFFER/2 chars
+    inline static constexpr int SIZE_OF_BUFFER = 256 * 1024; // this defines the length of the internal char buffer used for print shifting
+    inline static constexpr int SIZE_OF_POINTER_ARRAY = SIZE_OF_BUFFER/2; // this defines the length of the pointer array - we set it to SIZE_OF_BUFFER/2 so that it is at least long enough to hold the entire contents of the internal buffer without wrapping around, regardless of the data stored in the internal buffer since the smallest discrete data that can be stored in the internal buffer is a char, which is internally terminated with a null byte the highest number of independent data that can be stored in the pointer array is SIZE_OF_BUFFER/2 chars
     pointer_struct pointer_array[SIZE_OF_POINTER_ARRAY]; // the pointer_struct array
     char buffer[SIZE_OF_BUFFER]; // internal buffer used for print shifting
 
@@ -44,8 +44,7 @@ public:
     void flush(){
     // the flush function simply sets the atomic variable write_index to the value of the non atomic variable p_array_index so everything written since the last call to flush becomes visible to every other thread
 
-        // store the new write index
-        write_index = p_array_index;
+        write_index.store(p_array_index, std::memory_order_release); // we use the release memory order to ensure that all writes to the internal buffer and pointer array are visible to other threads before the write_index is updated
 
     }
 
