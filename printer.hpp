@@ -1,4 +1,7 @@
-#include "printshiftheaders.hpp"
+#pragma once
+
+#include "printer_headers.hpp"
+#include "printer_structure.hpp"
 
 // we now define the printing class
 class printer{
