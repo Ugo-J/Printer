@@ -21,12 +21,7 @@ private:
 private:
 
     // we define the pointer struct
-    struct pointer_struct{
-
-        int type;
-        void* pointer;
-
-    };
+    struct pointer_struct{ int type; void* pointer; };
 
 private:
 
@@ -93,10 +88,13 @@ public:
     // unsigned int print shift function
     Printer& print_shift(unsigned int x);
 
+    // int64 print shift function
     Printer& print_shift(int64_t x);
 
+    // uint64 print shift function
     Printer& print_shift(uint64_t x);
 
+    // double print shift function
     Printer& print_shift(double x);
 
 };

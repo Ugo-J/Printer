@@ -67,6 +67,7 @@ void Printer::print(){
         // we increment read index
         if( !((read_index + 1) < SIZE_OF_POINTER_ARRAY) ){
         // we test whether adding 1 to the current read index would cause it to wrap around the pointer array, if so we set the wrap variable to false because the thread that printshifts would have before now set it to true to indicate that it has wrapped around the pointer array
+
             wrap = false;
 
             // we fetch the updated last write value since the value of write_index the print function copied may have been set by the print_shift function when wrapping around the pointer array
@@ -81,7 +82,7 @@ void Printer::print(){
 
 }
 
-void Printer::print_shift(const char* data, int length_of_data){
+Printer& Printer::print_shift(const char* data, int length_of_data){
 // print_shift function for printshifting strings
 
     // we first check if the string length can be contained in the available space before the end of the internal buffer
@@ -264,9 +265,11 @@ void Printer::print_shift(const char* data, int length_of_data){
 
     }
 
+    return *this;
+
 }
 
-void Printer::print_shift(int x){
+Printer& Printer::print_shift(int x){
 // function for printshifting integers
 
     size_t free_space = end_of_buffer - (char*)buffer_cursor;
@@ -319,9 +322,12 @@ void Printer::print_shift(int x){
         // we increment our p_array_index
         p_array_index++;
 
+
+    return *this;
+
 }
 
-void Printer::print_shift(unsigned int x){
+Printer& Printer::print_shift(unsigned int x){
 // function for printshifting integers
 
     size_t free_space = end_of_buffer - (char*)buffer_cursor;
@@ -374,9 +380,12 @@ void Printer::print_shift(unsigned int x){
         // we increment our p_array_index
         p_array_index++;
 
+
+    return *this;
+
 }
 
-void Printer::print_shift(int64_t x){
+Printer& Printer::print_shift(int64_t x){
 // function for printshifting integers
 
     size_t free_space = end_of_buffer - (char*)buffer_cursor;
@@ -429,9 +438,12 @@ void Printer::print_shift(int64_t x){
         // we increment our p_array_index
         p_array_index++;
 
+
+    return *this;
+
 }
 
-void Printer::print_shift(uint64_t x){
+Printer& Printer::print_shift(uint64_t x){
 // function for printshifting integers
 
     size_t free_space = end_of_buffer - (char*)buffer_cursor;
@@ -484,9 +496,12 @@ void Printer::print_shift(uint64_t x){
         // we increment our p_array_index
         p_array_index++;
 
+
+    return *this;
+
 }
 
-void Printer::print_shift(double x){
+Printer& Printer::print_shift(double x){
 // function for printshifting integers
 
     size_t free_space = end_of_buffer - (char*)buffer_cursor;
@@ -538,5 +553,8 @@ void Printer::print_shift(double x){
     else
         // we increment our p_array_index
         p_array_index++;
+
+    
+    return *this;
 
 }
