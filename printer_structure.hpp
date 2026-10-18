@@ -31,7 +31,7 @@ private:
     // this defines the length of the internal char buffer used for print shifting - by default we allow 16 bytes for each pointer location so the default buffer size is 16 * SIZE_OF_POINTER_ARRAY
     int64_t SIZE_OF_BUFFER = 16 * SIZE_OF_POINTER_ARRAY;
 
-    // we set the size of the scratchpad used for holding data just before printing to 1MB
+    // we set the default size of the scratchpad used for holding data just before printing to 1MB
     int64_t SIZE_OF_SCRATCHPAD = 1024 * 1024;
     
     // the pointer_struct array pointer
@@ -73,7 +73,7 @@ public:
 
     // the free print function is used to print print shifted data from any number of printer objects
     template <typename... Printer>
-    static void print();
+    static void print_many(Printer&... p){ (p.print(), ...); }
 
 public:
 
