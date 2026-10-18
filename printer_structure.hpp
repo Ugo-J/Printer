@@ -49,8 +49,14 @@ private:
     // scratchpad pointer
     char* scratchpad = nullptr;
 
+    // we declare a pointer to point to the end of the scratchpad
+    char* end_of_scratchpad = nullptr;
+
     // prelude string pointer - the prelude is the text printed before the print shifted data in the printer buffer, it can be used to differentiate data from different printers
     char* prelude = nullptr;
+
+    // prelude string length - this is computed if the printer class is constructed with a prelude string
+    int prelude_len = 0;
 
 private: 
 
@@ -58,10 +64,10 @@ private:
     std::atomic<int64_t> write_index = 0ll;
 
     // this cursor is used to indicate the next write location in the internal buffer
-    void* buffer_cursor = buffer;
+    void* buffer_cursor = nullptr;
 
     // this pointer holds the address of the last location in the internal buffer
-    char* end_of_buffer = &buffer[SIZE_OF_BUFFER - 1];
+    char* end_of_buffer = nullptr;
 
     // this variable is used to indicate that print shifting has gotten to the end of the ponter array and wrapped around to the start of the array
     bool wrap = false;

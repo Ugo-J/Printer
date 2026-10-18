@@ -10,10 +10,10 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
     if(prelude_string != nullptr){
 
         // we fetch our prelude string length
-        int len = strlen(prelude_string);
+        prelude_len = strlen(prelude_string);
 
         // we allocate the char array to store our prelude string - we add 1 to our prelude_string length to account for the null terminating byte
-        prelude = new(std::nothrow) char[len + 1];
+        prelude = new(std::nothrow) char[prelude_len + 1];
 
         // we check that we successfully allocated memory for our prelude
         if(prelude != nullptr){
@@ -112,6 +112,14 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
 
                 }
 
+                // only continue if no error
+                if(!error){
+
+                    // we set the end of scratchpad pointer to the end of our declared scratchpad
+                    end_of_scratchpad = &scratchpad[SIZE_OF_SCRATCHPAD - 1];
+
+                }
+
             }
 
         }
@@ -148,64 +156,97 @@ void Printer::flush(){
 void Printer::print(){
 // the print function simply prints anything written to the internal buffer that hasn't been printed yet
 
-    // we first get a local write_index variable
-    int loc_write_index = write_index;
+    // only continue if no error
+    if(!error){
 
-    while((read_index < loc_write_index) || wrap){
+        // we first get a local write_index variable
+        int loc_write_index = write_index.load(std::memory_order_acquire);
 
-        std::cout<<(prelude != nullptr ? prelude : "");
+        // now we format all available data into our scratchpad so we call std::cout just minimally starting from our prelude
 
-        if(pointer_array[read_index].type == CHAR){
-        // this is a char* so we perform the necessary type casting
+        // we declare a local scratchpad cursor to use to traverse the scratchpad
+        char* scratchpad_cursor = scratchpad;
 
-            std::cout<<(char*)pointer_array[read_index].pointer;
+        // we copy our prelude into our scratchpad if not null
+        if(prelude != nullptr){
+            
+            strcpy(scratchpad, prelude);
 
-        }
-        else if(pointer_array[read_index].type == INTEGER){
-        // this is a int* so we perform the necessary type casting
-
-            std::cout<<*(int*)pointer_array[read_index].pointer;
-
-        }
-        else if(pointer_array[read_index].type == UNSIGNED_INTEGER){
-        // this is a unsigned int* so we perform the necessary type casting
-
-            std::cout<<*(unsigned int*)pointer_array[read_index].pointer;
-
-        }
-        else if(pointer_array[read_index].type == INT64){
-        // this is a int64_t* so we perform the necessary type casting
-
-            std::cout<<*(int64_t*)pointer_array[read_index].pointer;
-
-        }
-        else if(pointer_array[read_index].type == UINT64){
-        // this is a uint64_t* so we perform the necessary type casting
-
-            std::cout<<*(uint64_t*)pointer_array[read_index].pointer;
-
-        }
-        else if(pointer_array[read_index].type == DOUBLE){
-        // this is a double* so we perform the necessary type casting
-
-            std::cout<<*(double*)pointer_array[read_index].pointer;
+            // we increment our scratchpad cursor by our prelude length
+            scratchpad_cursor += prelude_len;
 
         }
 
+        // now we loop through our pointer array formatting the available data
+        while(read_index < loc_write_index){
 
-        // we increment read index
-        if( !((read_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-        // we test whether adding 1 to the current read index would cause it to wrap around the pointer array, if so we set the wrap variable to false because the thread that printshifts would have before now set it to true to indicate that it has wrapped around the pointer array
+            // we fetch our pointer read array index
+            int64_t r_array_index = read_index & (SIZE_OF_POINTER_ARRAY - 1);
 
-            wrap = false;
+            if(pointer_array[r_array_index].type == CHAR){
+            // this is a char* so we check the length to see if we can copy this into our scratchpad without wrapping
 
-            // we fetch the updated last write value since the value of write_index the print function copied may have been set by the print_shift function when wrapping around the pointer array
-            loc_write_index = write_index;
+                // we compute the length of this char*
+                int64_t len = strlen((char*)pointer_array[r_array_index].pointer);
+
+                if(len < (end_of_scratchpad - scratchpad_cursor)){
+
+                    // getting here the scratchpad has enough free space to copy this char* into it
+                    strcpy(scratchpad_cursor, (char*)pointer_array[r_array_index].pointer);
+
+                    // we increment the scratchpad cursor by the char* length
+                    scratchpad_cursor += len;
+
+                }
+                else{
+
+                    // getting here we don't have enough space in our scratchpad to hold this char* so we print the content of our scratchpad reset the scratchpad cursor and continue
+
+                    std::cout<<scratchpad;
+
+                    scratchpad_cursor = scratchpad;
+
+                    continue;
+
+                }
+
+            }
+            else if(pointer_array[r_array_index].type == INTEGER){
+            // this is a int* so we perform the necessary type casting
+
+                std::cout<<*(int*)pointer_array[read_index].pointer;
+
+            }
+            else if(pointer_array[r_array_index].type == UNSIGNED_INTEGER){
+            // this is a unsigned int* so we perform the necessary type casting
+
+                std::cout<<*(unsigned int*)pointer_array[read_index].pointer;
+
+            }
+            else if(pointer_array[r_array_index].type == INT64){
+            // this is a int64_t* so we perform the necessary type casting
+
+                std::cout<<*(int64_t*)pointer_array[read_index].pointer;
+
+            }
+            else if(pointer_array[r_array_index].type == UINT64){
+            // this is a uint64_t* so we perform the necessary type casting
+
+                std::cout<<*(uint64_t*)pointer_array[read_index].pointer;
+
+            }
+            else if(pointer_array[r_array_index].type == DOUBLE){
+            // this is a double* so we perform the necessary type casting
+
+                std::cout<<*(double*)pointer_array[read_index].pointer;
+
+            }
+
+
+            // we increment read index
+            read_index++;
 
         }
-                    
-        // increment the read_index variable using the ternary operator
-        read_index = ((read_index + 1) < SIZE_OF_POINTER_ARRAY)? ++read_index : (read_index + 1) % SIZE_OF_POINTER_ARRAY;
 
     }
 
