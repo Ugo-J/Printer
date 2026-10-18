@@ -8,6 +8,9 @@ public:
     // constructor
     Printer();
 
+    // destructor
+    ~Printer();
+
 private:
 
     // define the constants that define the pointer type
@@ -42,6 +45,9 @@ private:
 
     // scratchpad pointer
     char* scratchpad = nullptr;
+
+    // prelude string pointer - the prelude is the text printed before the print shifted data in the printer buffer, it can be used to differentiate data from different printers
+    char* prelude = nullptr;
 
 private: 
 

@@ -6,7 +6,38 @@
 // constructor
 Printer::Printer(){
 
+    // we allocate our pointer array
+    pointer_array = new(std::nothrow) pointer_struct[SIZE_OF_POINTER_ARRAY];
 
+    // we allocate our data buffer
+    buffer = new(std::nothrow) char[SIZE_OF_BUFFER];
+
+    // we update our buffer cursor
+    buffer_cursor = buffer;
+
+    // we update our end of buffer variable
+    end_of_buffer = &buffer[SIZE_OF_BUFFER - 1];
+
+    // we allocate our scratch pad
+    scratchpad = new(std::nothrow) char[SIZE_OF_SCRATCHPAD];
+
+    // we allocate and store our prelude
+
+}
+
+// destructor
+Printer::~Printer(){
+
+    // we delete our pointer array if allocated
+    if(pointer_array != nullptr) delete [] pointer_array;
+
+    // we delete our data buffer if allocated
+    if(buffer != nullptr) delete [] buffer;
+
+    // we delete our scratchpad if allocated
+    if(scratchpad != nullptr) delete [] scratchpad;
+
+    // we delete our prelude if allocated
 
 }
 
