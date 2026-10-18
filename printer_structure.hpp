@@ -6,7 +6,7 @@ class Printer{
 public:
 
     // constructor
-    Printer();
+    Printer(char* prelude_string = nullptr, int64_t pointer_array_size = 0ll, int64_t data_buffer_size = 0ll, int64_t scratchpad_size = 0ll);
 
     // destructor
     ~Printer();
@@ -25,6 +25,9 @@ private:
 
     // we define the pointer struct
     struct pointer_struct{ int type; void* pointer; };
+
+    // we define the Printer endl tag
+    static constexpr struct EndlTag {} endl{};
 
 private:
 
@@ -68,6 +71,16 @@ private:
 
     // this variable holds the pointer_array index where the next read should be read from
     int read_index = 0;
+
+private:
+
+    // error variables
+
+    bool error = false;
+
+    static constexpr int SIZE_OF_ERROR_BUFFER = 256;
+
+    char error_buffer[SIZE_OF_ERROR_BUFFER] = {'\0'};
 
 public:
 

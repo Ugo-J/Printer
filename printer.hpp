@@ -4,24 +4,119 @@
 #include "printer_structure.hpp"
 
 // constructor
-Printer::Printer(){
+Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_buffer_size, int64_t scratchpad_size){
 
-    // we allocate our pointer array
-    pointer_array = new(std::nothrow) pointer_struct[SIZE_OF_POINTER_ARRAY];
+    // we allocate and store our prelude if not null
+    if(prelude_string != nullptr){
 
-    // we allocate our data buffer
-    buffer = new(std::nothrow) char[SIZE_OF_BUFFER];
+        // we fetch our prelude string length
+        int len = strlen(prelude_string);
 
-    // we update our buffer cursor
-    buffer_cursor = buffer;
+        // we allocate the char array to store our prelude string - we add 1 to our prelude_string length to account for the null terminating byte
+        prelude = new(std::nothrow) char[len + 1];
 
-    // we update our end of buffer variable
-    end_of_buffer = &buffer[SIZE_OF_BUFFER - 1];
+        // we check that we successfully allocated memory for our prelude
+        if(prelude != nullptr){
 
-    // we allocate our scratch pad
-    scratchpad = new(std::nothrow) char[SIZE_OF_SCRATCHPAD];
+            // we copy our prelude string to our prelude buffer
+            strcpy(prelude, prelude_string);
 
-    // we allocate and store our prelude
+        }
+        else{
+
+            // getting here our prelude array allocation failed
+            strcpy(error_buffer, "Error allocating prelude array.");
+
+            error = true;
+
+        }
+
+    }
+
+    // only continue if no error
+    if(!error){
+
+        // we only update our pointer array size if it is > our current pointer array size and is a power of 2 else we fall back to our default pointer array size
+        if(pointer_array_size > SIZE_OF_POINTER_ARRAY && ((pointer_array_size & (pointer_array_size - 1)) == 0ll)){
+
+            // we update our SIZE OF POINTER ARRAY with the supplied pointer array size variable
+            SIZE_OF_POINTER_ARRAY = pointer_array_size;
+
+            // we update our data buffer by maintaining its 1:16 ration with our pointer array
+            SIZE_OF_BUFFER = 16 * SIZE_OF_POINTER_ARRAY;
+
+        }
+
+        // we allocate our pointer array
+        pointer_array = new(std::nothrow) pointer_struct[SIZE_OF_POINTER_ARRAY];
+
+        // we check that we successfully allocated memory for our pointer array
+        if(pointer_array == nullptr){
+
+            // getting here our pointer array allocation failed
+            strcpy(error_buffer, "Error allocating pointer array.");
+
+            error = true;
+
+        }
+
+        // only continue if no error
+        if(!error){
+
+            // we update our data buffer size if it is > our current data buffer size
+            if(data_buffer_size > SIZE_OF_BUFFER){
+
+                SIZE_OF_BUFFER = data_buffer_size;
+
+            }
+
+            // we allocate our data buffer
+            buffer = new(std::nothrow) char[SIZE_OF_BUFFER];
+
+            // we check that we successfully allocated memory for our data buffer
+            if(buffer == nullptr){
+
+                // getting here our data buffer allocation failed
+                strcpy(error_buffer, "Error allocating data buffer.");
+
+                error = true;
+
+            }
+
+            // only continue if no error
+            if(!error){
+
+                // we update our buffer cursor
+                buffer_cursor = buffer;
+
+                // we update our end of buffer variable
+                end_of_buffer = &buffer[SIZE_OF_BUFFER - 1];
+
+                // we update our scratchpad size if it is > our current scratchpad size
+                if(scratchpad_size > SIZE_OF_SCRATCHPAD){
+
+                    SIZE_OF_SCRATCHPAD = scratchpad_size;
+
+                }
+
+                // we allocate our scratch pad
+                scratchpad = new(std::nothrow) char[SIZE_OF_SCRATCHPAD];
+
+                // we check that we successfully allocated memory for our scratchpad
+                if(scratchpad == nullptr){
+
+                    // getting here our scratchpad allocation failed
+                    strcpy(error_buffer, "Error allocating scratchpad.");
+
+                    error = true;
+
+                }
+
+            }
+
+        }
+
+    }
 
 }
 
@@ -38,6 +133,7 @@ Printer::~Printer(){
     if(scratchpad != nullptr) delete [] scratchpad;
 
     // we delete our prelude if allocated
+    if(prelude != nullptr) delete [] prelude;
 
 }
 
@@ -56,6 +152,8 @@ void Printer::print(){
     int loc_write_index = write_index;
 
     while((read_index < loc_write_index) || wrap){
+
+        std::cout<<(prelude != nullptr ? prelude : "");
 
         if(pointer_array[read_index].type == CHAR){
         // this is a char* so we perform the necessary type casting
