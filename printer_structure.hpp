@@ -49,6 +49,9 @@ private:
     // scratchpad pointer
     char* scratchpad = nullptr;
 
+    // scratchpad cursor to use to traverse the scratchpad
+    char* scratchpad_cursor = nullptr;
+
     // we declare a pointer to point to the end of the scratchpad
     char* end_of_scratchpad = nullptr;
 

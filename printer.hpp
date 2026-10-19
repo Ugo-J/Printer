@@ -115,6 +115,9 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
                 // only continue if no error
                 if(!error){
 
+                    // we set our scratchpad cursor to point to the scratchpad
+                    scratchpad_cursor = scratchpad;
+
                     // we set the end of scratchpad pointer to the end of our declared scratchpad
                     end_of_scratchpad = &scratchpad[SIZE_OF_SCRATCHPAD - 1];
 
@@ -160,12 +163,9 @@ void Printer::print(){
     if(!error){
 
         // we first get a local write_index variable
-        int loc_write_index = write_index.load(std::memory_order_acquire);
+        int64_t loc_write_index = write_index.load(std::memory_order_acquire);
 
-        // now we format all available data into our scratchpad so we call std::cout just minimally starting from our prelude
-
-        // we declare a local scratchpad cursor to use to traverse the scratchpad
-        char* scratchpad_cursor = scratchpad;
+        // now we format all available data into our scratchpad so we call write just minimally starting from our prelude
 
         // we copy our prelude into our scratchpad if not null
         if(prelude != nullptr){
