@@ -84,10 +84,9 @@ private:
 private:
 
     // error variables
-
     bool error = false;
 
-    static constexpr int SIZE_OF_ERROR_BUFFER = 256;
+    static constexpr int SIZE_OF_ERROR_BUFFER = 128;
 
     char error_buffer[SIZE_OF_ERROR_BUFFER] = {'\0'};
 
