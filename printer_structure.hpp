@@ -13,6 +13,11 @@ public:
 
 private:
 
+    // stdout file descriptor
+    static constexpr int STDOUT = 1;
+
+private:
+
     // define the constants that define the pointer type
     inline static constexpr int CHAR = 0;
     inline static constexpr int INTEGER = 1;

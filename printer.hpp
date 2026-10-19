@@ -165,12 +165,15 @@ void Printer::print(){
         // we first get a local write_index variable
         int64_t loc_write_index = write_index.load(std::memory_order_acquire);
 
+        // we point our scratchpad cursor back to scratchpad
+        scratchpad_cursor = scratchpad;
+
         // now we format all available data into our scratchpad so we call write just minimally starting from our prelude
 
         // we copy our prelude into our scratchpad if not null
         if(prelude != nullptr){
-            
-            strcpy(scratchpad, prelude);
+
+            memcpy(scratchpad, prelude, prelude_len);
 
             // we increment our scratchpad cursor by our prelude length
             scratchpad_cursor += prelude_len;
@@ -245,6 +248,38 @@ void Printer::print(){
 
             // we increment read index
             read_index++;
+
+        }
+
+        // we print our data if our scratchpad is full
+        if(scratchpad_cursor >= end_of_scratchpad){
+
+            ssize_t data_to_print = scratchpad_cursor - scratchpad;
+
+            // we set scratchpad cursor back to cursor so we can use it to traverse our data to print
+            scratchpad_cursor = scratchpad;
+
+            while(data_to_print > 0){
+
+                ssize_t data_printed = write(STDOUT, scratchpad_cursor, data_to_print);
+
+                if(data_printed < 0){
+
+                    // if our write was interrupted we simply continue
+                    if(errno == EINTR) continue;
+                    
+                    // getting here we got an error not caused by an interrupt so we break from our print loop
+                    break;
+
+                }
+
+                // we increment our scratchpad cursor
+                scratchpad_cursor += data_printed;
+
+                // we decrement our data to print length
+                data_to_print -= data_printed;
+
+            }
 
         }
 

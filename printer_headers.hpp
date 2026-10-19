@@ -4,3 +4,4 @@
 #include <atomic>
 #include <charconv>
 #include <unistd.h>
+#include <cerrno>
