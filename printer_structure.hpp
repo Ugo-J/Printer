@@ -85,10 +85,10 @@ private:
     bool wrap = false;
 
     // this variable indicates the index in the pointer_array where the next entry should be entered
-    int p_array_index = 0;
+    int64_t p_array_index = 0;
 
-    // this variable holds the pointer_array index where the next read should be read from
-    int read_index = 0;
+    // this variable holds the pointer_array index where the next read should be read from - this is an atomic variable so the write thread can know when the pointer array is full
+    std::atomic <int64_t> read_index = 0ll;
 
 private:
 
