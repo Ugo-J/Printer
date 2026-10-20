@@ -25,6 +25,7 @@ private:
     inline static constexpr int INT64 = 3;
     inline static constexpr int UINT64 = 4;
     inline static constexpr int DOUBLE = 5;
+    inline static constexpr int ENDL = 6;
 
 private:
 
@@ -94,6 +95,12 @@ private:
     static constexpr int SIZE_OF_ERROR_BUFFER = 128;
 
     char error_buffer[SIZE_OF_ERROR_BUFFER] = {'\0'};
+
+    // the failed writes variable is used to keep track of the writes to screen that failed due to the write system call returning an error
+    int64_t failed_writes = 0ll;
+
+    // the dropped data variable is used to keep track of the number of times data had to be dropped from print shift calls due to the pointer array or the data buffer being full
+    int64_t dropped_data = 0ll;
 
 public:
 

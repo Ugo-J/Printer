@@ -174,10 +174,8 @@ void Printer::write_to_screen(){
                 // if our write was interrupted we simply continue
                 if(errno == EINTR) continue;
 
-                // getting here we got an error not caused by an interrupt so we set our error and break from our print loop
-                strcpy(error_buffer, "Error writing data to screen.");
-
-                error = true;
+                // getting here we got an error not caused by an interrupt so we increment our failed writes variable and break from our print loop
+                failed_writes++;
 
                 break;
 
@@ -226,9 +224,6 @@ void Printer::print(){
         // now we loop through our pointer array formatting the available data
         while(read_index < loc_write_index){
 
-            // we break if error was set by a previous failed write attempt
-            if(error) break;
-
             // we fetch our pointer read array index
             int64_t r_array_index = read_index & (SIZE_OF_POINTER_ARRAY - 1);
 
@@ -238,7 +233,7 @@ void Printer::print(){
                 // we compute the length of this char*
                 size_t len = strlen((char*)pointer_array[r_array_index].pointer);
 
-                if(len <= static_cast<size_t>(end_of_scratchpad - scratchpad_cursor + 1)){
+                if(len <= static_cast<ssize_t>(end_of_scratchpad - scratchpad_cursor + 1)){
 
                     // getting here the scratchpad has enough free space to copy this char* into it
                     memcpy(scratchpad_cursor, pointer_array[r_array_index].pointer, len);
@@ -269,10 +264,8 @@ void Printer::print(){
                                 // if our write was interrupted we simply continue
                                 if(errno == EINTR) continue;
                                 
-                                // getting here we got an error not caused by an interrupt so we set our error and break from our print loop
-                                strcpy(error_buffer, "Error writing data to screen.");
-
-                                error = true;
+                                // getting here we got an error not caused by an interrupt so we increment our failed writes variable and break from our print loop
+                                failed_writes++;
 
                                 break;
 
@@ -327,7 +320,32 @@ void Printer::print(){
                 std::cout<<*(double*)pointer_array[read_index].pointer;
 
             }
+            else if(pointer_array[r_array_index].type == ENDL){
+            // this is an ENDL write so we add a new line to our scratchpad and call our write to screen function
 
+                if(scratchpad_cursor <= end_of_scratchpad){
+
+                    // we write a new line to the location pointed at by our scratchpad cursor
+                    *scratchpad_cursor++ = '\n';
+
+                    // now we call our write to screen function
+                    write_to_screen();
+
+                }
+                else{
+
+                    // getting here we don't have enough space in our scratchpad to add our new line character so we call our write to screen function and then call write system call directly on the new line character so we can print it without touching our scratchpad cursor
+                    write_to_screen();
+
+                    // we call write system call
+                    ssize_t data_printed = 0;
+
+                    do{ data_printed = write(STDOUT, "\n", 1); } while(data_printed < 0 && errno == EINTR);
+                    if(data_printed < 0) failed_writes++;
+
+                }
+
+            }
 
             // we increment read index
             read_index++;
