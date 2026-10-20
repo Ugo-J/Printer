@@ -99,27 +99,42 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
 
                 }
 
-                // we allocate our scratch pad
-                scratchpad = new(std::nothrow) char[SIZE_OF_SCRATCHPAD];
+                // we check that the prelude len if an is < the scratchpad size else we set the error flag
+                if(prelude != nullptr && prelude_len > SIZE_OF_SCRATCHPAD){
 
-                // we check that we successfully allocated memory for our scratchpad
-                if(scratchpad == nullptr){
-
-                    // getting here our scratchpad allocation failed
-                    strcpy(error_buffer, "Error allocating scratchpad.");
+                    // getting here our prelude len is > our scratchpad size so we set our error flag
+                    strcpy(error_buffer, "Prelude length larger scratchpad size.");
 
                     error = true;
 
                 }
 
                 // only continue if no error
-                if(!error){
+                if(!error){                
 
-                    // we set our scratchpad cursor to point to the scratchpad
-                    scratchpad_cursor = scratchpad;
+                    // we allocate our scratch pad
+                    scratchpad = new(std::nothrow) char[SIZE_OF_SCRATCHPAD];
 
-                    // we set the end of scratchpad pointer to the end of our declared scratchpad
-                    end_of_scratchpad = &scratchpad[SIZE_OF_SCRATCHPAD - 1];
+                    // we check that we successfully allocated memory for our scratchpad
+                    if(scratchpad == nullptr){
+
+                        // getting here our scratchpad allocation failed
+                        strcpy(error_buffer, "Error allocating scratchpad.");
+
+                        error = true;
+
+                    }
+
+                    // only continue if no error
+                    if(!error){
+
+                        // we set our scratchpad cursor to point to the scratchpad
+                        scratchpad_cursor = scratchpad;
+
+                        // we set the end of scratchpad pointer to the end of our declared scratchpad
+                        end_of_scratchpad = &scratchpad[SIZE_OF_SCRATCHPAD - 1];
+
+                    }
 
                 }
 
@@ -231,7 +246,7 @@ void Printer::print(){
             // this is a char* so we check the length to see if we can copy this into our scratchpad without wrapping
 
                 // we compute the length of this char*
-                size_t len = strlen((char*)pointer_array[r_array_index].pointer);
+                ssize_t len = strlen((char*)pointer_array[r_array_index].pointer);
 
                 if(len <= static_cast<ssize_t>(end_of_scratchpad - scratchpad_cursor + 1)){
 
