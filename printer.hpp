@@ -175,42 +175,37 @@ void Printer::write_to_screen(){
 
     if(!error){
 
-        // we only write if we have data other than the prelude to print
-        if(scratchpad_cursor > scratchpad + prelude_len){
+        ssize_t data_to_print = scratchpad_cursor - scratchpad;
 
-            ssize_t data_to_print = scratchpad_cursor - scratchpad;
+        // we set scratchpad cursor back to cursor so we can use it to traverse our data to print
+        scratchpad_cursor = scratchpad;
 
-            // we set scratchpad cursor back to cursor so we can use it to traverse our data to print
-            scratchpad_cursor = scratchpad;
+        while(data_to_print > 0){
 
-            while(data_to_print > 0){
+            ssize_t data_printed = write(STDOUT, scratchpad_cursor, data_to_print);
 
-                ssize_t data_printed = write(STDOUT, scratchpad_cursor, data_to_print);
+            if(data_printed < 0){
 
-                if(data_printed < 0){
+                // if our write was interrupted we simply continue
+                if(errno == EINTR) continue;
 
-                    // if our write was interrupted we simply continue
-                    if(errno == EINTR) continue;
+                // getting here we got an error not caused by an interrupt so we increment our failed writes variable and break from our print loop
+                failed_writes++;
 
-                    // getting here we got an error not caused by an interrupt so we increment our failed writes variable and break from our print loop
-                    failed_writes++;
-
-                    break;
-
-                }
-
-                // we increment our scratchpad cursor
-                scratchpad_cursor += data_printed;
-
-                // we decrement our data to print length
-                data_to_print -= data_printed;
+                break;
 
             }
 
-            // now we set our scratchpad cursor back to our scratchpad for our next print
-            scratchpad_cursor = scratchpad;
+            // we increment our scratchpad cursor
+            scratchpad_cursor += data_printed;
+
+            // we decrement our data to print length
+            data_to_print -= data_printed;
 
         }
+
+        // now we set our scratchpad cursor back to our scratchpad for our next print
+        scratchpad_cursor = scratchpad;
 
     }
 
@@ -275,8 +270,8 @@ void Printer::print(){
                     // our write to screen function resets our scratchpad cursor internally before returning so we don't need to reset our scratchpad cursor again
                     write_to_screen();
 
-                    // now we check if the char* len is > our scratchpad size in which case we have to print the char* directly to screen as it can't be contained in the scratchpad
-                    if(len > SIZE_OF_SCRATCHPAD){
+                    // now we check if the char* len is > our scratchpad size - prelude_len in which case we have to print the char* directly to screen as it can't be contained in the scratchpad
+                    if(len > SIZE_OF_SCRATCHPAD - prelude_len){
 
                         // we cast our pointer array pointer into a char and store it in a local variable
                         char* loc_data = (char*)pointer_array[r_array_index].pointer;
@@ -319,8 +314,8 @@ void Printer::print(){
             else if(pointer_array[r_array_index].type == INTEGER){
             // this is a int* so we perform the necessary type casting
 
-                // we check if our MIN_NUM_SPACE is < our available space
-                if(MIN_NUM_SPACE < available_space){
+                // we check if our MIN_NUM_SPACE is <= our available space
+                if(MIN_NUM_SPACE <= available_space){
 
                     scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(int*)pointer_array[r_array_index].pointer).ptr;
 
@@ -338,8 +333,8 @@ void Printer::print(){
             else if(pointer_array[r_array_index].type == UNSIGNED_INTEGER){
             // this is a unsigned int* so we perform the necessary type casting
 
-                // we check if our MIN_NUM_SPACE is < our available space
-                if(MIN_NUM_SPACE < available_space){
+                // we check if our MIN_NUM_SPACE is <= our available space
+                if(MIN_NUM_SPACE <= available_space){
 
                     scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(unsigned int*)pointer_array[r_array_index].pointer).ptr;
 
@@ -357,8 +352,8 @@ void Printer::print(){
             else if(pointer_array[r_array_index].type == INT64){
             // this is a int64_t* so we perform the necessary type casting
 
-                // we check if our MIN_NUM_SPACE is < our available space
-                if(MIN_NUM_SPACE < available_space){
+                // we check if our MIN_NUM_SPACE is <= our available space
+                if(MIN_NUM_SPACE <= available_space){
 
                     scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(int64_t*)pointer_array[r_array_index].pointer).ptr;
 
@@ -376,8 +371,8 @@ void Printer::print(){
             else if(pointer_array[r_array_index].type == UINT64){
             // this is a uint64_t* so we perform the necessary type casting
 
-                // we check if our MIN_NUM_SPACE is < our available space
-                if(MIN_NUM_SPACE < available_space){
+                // we check if our MIN_NUM_SPACE is <= our available space
+                if(MIN_NUM_SPACE <= available_space){
 
                     scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(uint64_t*)pointer_array[r_array_index].pointer).ptr;
 
@@ -395,8 +390,8 @@ void Printer::print(){
             else if(pointer_array[r_array_index].type == DOUBLE){
             // this is a double* so we perform the necessary type casting
 
-                // we check if our MIN_NUM_SPACE is < our available space
-                if(MIN_NUM_SPACE < available_space){
+                // we check if our MIN_NUM_SPACE is <= our available space
+                if(MIN_NUM_SPACE <= available_space){
 
                     scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(double*)pointer_array[r_array_index].pointer).ptr;
 

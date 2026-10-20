@@ -68,7 +68,7 @@ private:
     char* prelude = nullptr;
 
     // prelude string length - this is computed if the printer class is constructed with a prelude string
-    int prelude_len = 0;
+    ssize_t prelude_len = 0;
 
 private: 
 
