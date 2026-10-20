@@ -156,8 +156,50 @@ void Printer::flush(){
 
 }
 
+void Printer::write_to_screen(){
+
+    if(!error){
+
+        ssize_t data_to_print = scratchpad_cursor - scratchpad;
+
+        // we set scratchpad cursor back to cursor so we can use it to traverse our data to print
+        scratchpad_cursor = scratchpad;
+
+        while(data_to_print > 0){
+
+            ssize_t data_printed = write(STDOUT, scratchpad_cursor, data_to_print);
+
+            if(data_printed < 0){
+
+                // if our write was interrupted we simply continue
+                if(errno == EINTR) continue;
+
+                // getting here we got an error not caused by an interrupt so we set our error and break from our print loop
+                strcpy(error_buffer, "Error writing data to screen.");
+
+                error = true;
+
+                break;
+
+            }
+
+            // we increment our scratchpad cursor
+            scratchpad_cursor += data_printed;
+
+            // we decrement our data to print length
+            data_to_print -= data_printed;
+
+        }
+
+        // now we set our scratchpad cursor back to our scratchpad for our next print
+        scratchpad_cursor = scratchpad;
+
+    }
+
+}
+
 void Printer::print(){
-// the print function simply prints anything written to the internal buffer that hasn't been printed yet
+// the print function simply writes anything written to the internal buffer that hasn't been printed yet to our scratchpad
 
     // only continue if no error
     if(!error){
@@ -165,23 +207,27 @@ void Printer::print(){
         // we first get a local write_index variable
         int64_t loc_write_index = write_index.load(std::memory_order_acquire);
 
-        // we point our scratchpad cursor back to scratchpad
-        scratchpad_cursor = scratchpad;
-
         // now we format all available data into our scratchpad so we call write just minimally starting from our prelude
 
-        // we copy our prelude into our scratchpad if not null
+        // we copy our prelude into our scratchpad if our prelude is not null and we are at the start of our scratchpad
         if(prelude != nullptr){
 
-            memcpy(scratchpad, prelude, prelude_len);
+            if(scratchpad_cursor == scratchpad){
 
-            // we increment our scratchpad cursor by our prelude length
-            scratchpad_cursor += prelude_len;
+                memcpy(scratchpad_cursor, prelude, prelude_len);
+
+                // we increment our scratchpad cursor by our prelude length
+                scratchpad_cursor += prelude_len;
+
+            }
 
         }
 
         // now we loop through our pointer array formatting the available data
         while(read_index < loc_write_index){
+
+            // we break if error was set by a previous failed write attempt
+            if(error) break;
 
             // we fetch our pointer read array index
             int64_t r_array_index = read_index & (SIZE_OF_POINTER_ARRAY - 1);
@@ -190,12 +236,12 @@ void Printer::print(){
             // this is a char* so we check the length to see if we can copy this into our scratchpad without wrapping
 
                 // we compute the length of this char*
-                int64_t len = strlen((char*)pointer_array[r_array_index].pointer);
+                size_t len = strlen((char*)pointer_array[r_array_index].pointer);
 
-                if(len < (end_of_scratchpad - scratchpad_cursor)){
+                if(len <= static_cast<size_t>(end_of_scratchpad - scratchpad_cursor + 1)){
 
                     // getting here the scratchpad has enough free space to copy this char* into it
-                    strcpy(scratchpad_cursor, (char*)pointer_array[r_array_index].pointer);
+                    memcpy(scratchpad_cursor, pointer_array[r_array_index].pointer, len);
 
                     // we increment the scratchpad cursor by the char* length
                     scratchpad_cursor += len;
@@ -203,13 +249,50 @@ void Printer::print(){
                 }
                 else{
 
-                    // getting here we don't have enough space in our scratchpad to hold this char* so we print the content of our scratchpad reset the scratchpad cursor and continue
+                    // getting here we don't have enough space in our scratchpad to hold this char* so we print the content of our scratchpad to screen and continue
 
-                    std::cout<<scratchpad;
+                    // our write to screen function resets our scratchpad cursor internally before returning so we don't need to reset our scratchpad cursor again
+                    write_to_screen();
 
-                    scratchpad_cursor = scratchpad;
+                    // now we check if the char* len is > our scratchpad size in which case we have to print the char* directly to screen as it can't be contained in the scratchpad
+                    if(len > SIZE_OF_SCRATCHPAD){
 
-                    continue;
+                        // we cast our pointer array pointer into a char and store it in a local variable
+                        char* loc_data = (char*)pointer_array[r_array_index].pointer;
+
+                        while(len > 0){
+
+                            ssize_t data_printed = write(STDOUT, loc_data, len);
+
+                            if(data_printed < 0){
+
+                                // if our write was interrupted we simply continue
+                                if(errno == EINTR) continue;
+                                
+                                // getting here we got an error not caused by an interrupt so we set our error and break from our print loop
+                                strcpy(error_buffer, "Error writing data to screen.");
+
+                                error = true;
+
+                                break;
+
+                            }
+
+                            // we increment our loc data pointer
+                            loc_data += data_printed;
+
+                            // we decrement our char* len
+                            len -= data_printed;
+
+                        }
+
+                    }
+                    else{
+
+                        // getting here the char* len can fit into the scratchpad so we just continue
+                        continue;
+
+                    }
 
                 }
 
@@ -254,32 +337,8 @@ void Printer::print(){
         // we print our data if our scratchpad is full
         if(scratchpad_cursor >= end_of_scratchpad){
 
-            ssize_t data_to_print = scratchpad_cursor - scratchpad;
-
-            // we set scratchpad cursor back to cursor so we can use it to traverse our data to print
-            scratchpad_cursor = scratchpad;
-
-            while(data_to_print > 0){
-
-                ssize_t data_printed = write(STDOUT, scratchpad_cursor, data_to_print);
-
-                if(data_printed < 0){
-
-                    // if our write was interrupted we simply continue
-                    if(errno == EINTR) continue;
-                    
-                    // getting here we got an error not caused by an interrupt so we break from our print loop
-                    break;
-
-                }
-
-                // we increment our scratchpad cursor
-                scratchpad_cursor += data_printed;
-
-                // we decrement our data to print length
-                data_to_print -= data_printed;
-
-            }
+            // we write our scratchpad data to screen
+            write_to_screen();
 
         }
 

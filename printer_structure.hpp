@@ -100,6 +100,9 @@ public:
     // the flush function makes all print shifted data visible to the printing thread
     void flush();
 
+    // the write to screen function prints all data in the scratchpad to the screen
+    void write_to_screen();
+
     // the print function is used to print all print shifted data
     void print();
 
