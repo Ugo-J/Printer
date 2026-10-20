@@ -16,6 +16,9 @@ private:
     // stdout file descriptor
     static constexpr int STDOUT = 1;
 
+    // minimum available space in bytes for parsing numbers - this constant sets the minimum space that would be available in the scratchpad before we format a number into the scratchpad, we declare this constant as a ssize_t because it would be compared to the result of pointer arithmetic
+    static constexpr ssize_t MIN_NUM_SPACE = 30;
+
 private:
 
     // define the constants that define the pointer type

@@ -222,25 +222,28 @@ void Printer::print(){
 
         // now we format all available data into our scratchpad so we call write just minimally starting from our prelude
 
-        // we copy our prelude into our scratchpad if our prelude is not null and we are at the start of our scratchpad
-        if(prelude != nullptr){
-
-            if(scratchpad_cursor == scratchpad){
-
-                memcpy(scratchpad_cursor, prelude, prelude_len);
-
-                // we increment our scratchpad cursor by our prelude length
-                scratchpad_cursor += prelude_len;
-
-            }
-
-        }
-
         // now we loop through our pointer array formatting the available data
         while(read_index < loc_write_index){
 
+            // we copy our prelude into our scratchpad if our prelude is not null and we are at the start of our scratchpad
+            if(prelude != nullptr){
+
+                if(scratchpad_cursor == scratchpad){
+
+                    memcpy(scratchpad_cursor, prelude, prelude_len);
+
+                    // we increment our scratchpad cursor by our prelude length
+                    scratchpad_cursor += prelude_len;
+
+                }
+
+            }
+
             // we fetch our pointer read array index
             int64_t r_array_index = read_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we compute the available space in our scratchpad
+            ssize_t available_space = static_cast<ssize_t>(end_of_scratchpad - scratchpad_cursor + 1);
 
             if(pointer_array[r_array_index].type == CHAR){
             // this is a char* so we check the length to see if we can copy this into our scratchpad without wrapping
@@ -248,7 +251,7 @@ void Printer::print(){
                 // we compute the length of this char*
                 ssize_t len = strlen((char*)pointer_array[r_array_index].pointer);
 
-                if(len <= static_cast<ssize_t>(end_of_scratchpad - scratchpad_cursor + 1)){
+                if(len <= available_space){
 
                     // getting here the scratchpad has enough free space to copy this char* into it
                     memcpy(scratchpad_cursor, pointer_array[r_array_index].pointer, len);
@@ -308,7 +311,20 @@ void Printer::print(){
             else if(pointer_array[r_array_index].type == INTEGER){
             // this is a int* so we perform the necessary type casting
 
-                std::cout<<*(int*)pointer_array[read_index].pointer;
+                // we check if our MIN_NUM_SPACE is < our available space
+                if(MIN_NUM_SPACE < available_space){
+
+                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(int*)pointer_array[r_array_index].pointer).ptr;
+
+                }
+                else{
+
+                    // getting here we have < our min num space in our scratchpad so we write to screen and continue
+                    write_to_screen();
+
+                    continue;
+
+                }
 
             }
             else if(pointer_array[r_array_index].type == UNSIGNED_INTEGER){
