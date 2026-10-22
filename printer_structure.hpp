@@ -33,7 +33,22 @@ private:
 private:
 
     // we define the pointer struct
-    struct pointer_struct{ int type; void* pointer; };
+    struct pointer_struct{
+
+        // the type member defines the data type the pointer struct holds 
+        int type;
+
+        // this anonymous union member holds the data this pointer struct holds, for char* data types it holds the pointer to the char* in our data buffer
+        union {
+            char* pointer;
+            int x_int;
+            unsigned int x_uint;
+            double x_double;
+            int64_t x_int64;
+            uint64_t x_uint64;
+        }
+
+    };
 
     // we define the Printer endl tag
     static constexpr struct EndlTag {} endl{};
@@ -70,13 +85,19 @@ private:
     // prelude string length - this is computed if the printer class is constructed with a prelude string
     ssize_t prelude_len = 0;
 
+    // counter used to keep track of written bytes in the data buffer
+    int64_t data_write = 0ll;
+
+    // counter used to keep track of read bytes in the data buffer - this variable is declared as atomic so the print shift thread knows where exactly the print thread is and it doesn't overwrite data that hasn't been printed yet
+    std::atomic<int64_t> data_read = 0ll;
+
 private: 
 
     // this variable when updated holds the index of the pointer_array where the next write should occur, it is made atomic so once it is updated the change is visible to all threads
     std::atomic<int64_t> write_index = 0ll;
 
     // this cursor is used to indicate the next write location in the internal buffer
-    void* buffer_cursor = nullptr;
+    char* buffer_cursor = nullptr;
 
     // this pointer holds the address of the last location in the internal buffer
     char* end_of_buffer = nullptr;

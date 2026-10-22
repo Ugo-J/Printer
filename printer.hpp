@@ -149,6 +149,9 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
 // destructor
 Printer::~Printer(){
 
+    // we write to screen any unwritten data in the scratchpad if we have data other than the prelude in the scratchpad
+    if(scratchpad_cursor - scratchpad > prelude_len) write_to_screen();
+
     // we delete our pointer array if allocated
     if(pointer_array != nullptr) delete [] pointer_array;
 
@@ -317,7 +320,7 @@ void Printer::print(){
                 // we check if our MIN_NUM_SPACE is <= our available space
                 if(MIN_NUM_SPACE <= available_space){
 
-                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(int*)pointer_array[r_array_index].pointer).ptr;
+                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, pointer_array[r_array_index].x_int).ptr;
 
                 }
                 else{
@@ -336,7 +339,7 @@ void Printer::print(){
                 // we check if our MIN_NUM_SPACE is <= our available space
                 if(MIN_NUM_SPACE <= available_space){
 
-                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(unsigned int*)pointer_array[r_array_index].pointer).ptr;
+                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, pointer_array[r_array_index].x_uint).ptr;
 
                 }
                 else{
@@ -355,7 +358,7 @@ void Printer::print(){
                 // we check if our MIN_NUM_SPACE is <= our available space
                 if(MIN_NUM_SPACE <= available_space){
 
-                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(int64_t*)pointer_array[r_array_index].pointer).ptr;
+                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, pointer_array[r_array_index].x_int64).ptr;
 
                 }
                 else{
@@ -374,7 +377,7 @@ void Printer::print(){
                 // we check if our MIN_NUM_SPACE is <= our available space
                 if(MIN_NUM_SPACE <= available_space){
 
-                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(uint64_t*)pointer_array[r_array_index].pointer).ptr;
+                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, pointer_array[r_array_index].x_uint64).ptr;
 
                 }
                 else{
@@ -393,7 +396,7 @@ void Printer::print(){
                 // we check if our MIN_NUM_SPACE is <= our available space
                 if(MIN_NUM_SPACE <= available_space){
 
-                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, *(double*)pointer_array[r_array_index].pointer).ptr;
+                    scratchpad_cursor = std::to_chars(scratchpad_cursor, end_of_scratchpad + 1, pointer_array[r_array_index].x_double).ptr;
 
                 }
                 else{
