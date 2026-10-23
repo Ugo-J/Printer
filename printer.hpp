@@ -457,7 +457,10 @@ Printer& Printer::print_shift(const char* data){
     if(!error){
 
         // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
-        if(p_array_index - read_index.load(std::memory_order_acquire) >= SIZE_OF_POINTER_ARRAY){
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // we check if the supplied parameter is a nullptr and return if it is
+            if(data == nullptr) return *this;
 
             // getting here we have free space in our pointer array so we compute the length of this string
             int64_t len = strlen(data);
@@ -465,8 +468,16 @@ Printer& Printer::print_shift(const char* data){
             // we compute the used space in our data buffer
             int64_t used_space = data_write - data_read.load(std::memory_order_acquire);
 
-            // if the free space (data array size - used space) is < len + 1 we drop this data, increment our dropped data and return - we add 1 to the string length to account for the null byte
-            if(SIZE_OF_BUFFER - used_space < len + 1){ dropped_data++; return *this; }
+            // if the free space (data array size - used space) is < len + 1 we flush data if unflushed, drop this data, increment our dropped data and return - we add 1 to the string length to account for the null byte
+            if(SIZE_OF_BUFFER - used_space < len + 1){
+
+                // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+                if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+                dropped_data++;
+                return *this;
+
+            }
 
             // we unmask our pointer array index
             int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
@@ -485,8 +496,16 @@ Printer& Printer::print_shift(const char* data){
 
             }
 
-            // now we check if our used space + required space > SIZE_OF_BUFFER, if it is then we don't have sufficient contiguous space for this char* string so we drop the data, increment our dropped data counter and return
-            if(used_space + required_space > SIZE_OF_BUFFER){ dropped_data++; return *this; }
+            // now we check if our used space + required space > SIZE_OF_BUFFER, if it is then we don't have sufficient contiguous space for this char* string so we we flush data if unflushed, drop the data, increment our dropped data counter and return
+            if(used_space + required_space > SIZE_OF_BUFFER){
+
+                // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+                if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+                dropped_data++;
+                return *this;
+
+            }
 
             // getting here we can enter this data into our buffer
 
