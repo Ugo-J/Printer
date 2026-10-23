@@ -462,8 +462,59 @@ Printer& Printer::print_shift(const char* data){
             // getting here we have free space in our pointer array so we compute the length of this string
             int64_t len = strlen(data);
 
-            // we fetch our write array index into the pointer array which is our unmasked p_array_index
+            // we compute the used space in our data buffer
+            int64_t used_space = data_write - data_read.load(std::memory_order_acquire);
+
+            // if the free space (data array size - used space) is < len + 1 we drop this data, increment our dropped data and return - we add 1 to the string length to account for the null byte
+            if(SIZE_OF_BUFFER - used_space < len + 1){ dropped_data++; return *this; }
+
+            // we unmask our pointer array index
             int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we compute the required space for this string - we compute this differently from the value the free space is compared to above because if our required space isn't contiguous we would update it in place
+            int64_t required_space = len + 1;
+
+            // we fetch our write array index into the data buffer which is our unmasked data_write
+            int64_t w_buffer_index = data_write & (SIZE_OF_BUFFER - 1);
+
+            // we now check if the contiguous space from our write buffer index to the end of our data buffer is sufficient to hold this char* string - if it isn't we add the contiguous space to our required space and set our buffer index to 0
+            if(w_buffer_index + required_space > SIZE_OF_BUFFER){
+
+                required_space += SIZE_OF_BUFFER - w_buffer_index;
+                w_buffer_index = 0ll;
+
+            }
+
+            // now we check if our used space + required space > SIZE_OF_BUFFER, if it is then we don't have sufficient contiguous space for this char* string so we drop the data, increment our dropped data counter and return
+            if(used_space + required_space > SIZE_OF_BUFFER){ dropped_data++; return *this; }
+
+            // getting here we can enter this data into our buffer
+
+            // we compute our destination pointer from our write buffer index
+            char* p_dest = buffer + w_buffer_index;
+
+            // we store the location and type of this entry in the pointer array
+            pointer_array[w_array_index].type = CHAR;
+
+            pointer_array[w_array_index].pointer = p_dest;
+
+            // we copy our data to the internal buffer
+            memcpy(p_dest, data, len);
+
+            // we increment our p_dest pointer by our data len so we can null terminate our data
+            p_dest += len;
+
+            // we null terminate our data
+            *p_dest++ = '\0';
+
+            // we now update our data write counter by adding our required space to it
+            data_write += required_space;
+
+            // we set our data end variable in our pointer array entry to our updated data_write variable
+            pointer_array[w_array_index].data_end = data_write;
+
+            // finally we increment our p_array_index variable
+            p_array_index++;
 
             // we first check if the string length can be contained in the available space before the end of the internal buffer
             if(length_of_data + 1 < end_of_buffer - (char*)buffer_cursor){
