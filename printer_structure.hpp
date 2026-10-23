@@ -46,7 +46,7 @@ private:
             double x_double;
             int64_t x_int64;
             uint64_t x_uint64;
-        }
+        };
 
         // the data end member holds the data write unmasked value for a char* write, thisis published to the data_read variable after the print thread has read it
         int64_t data_end = 0ll;
@@ -98,9 +98,6 @@ private:
 
     // this variable when updated holds the index of the pointer_array where the next write should occur, it is made atomic so once it is updated the change is visible to all threads - the flush function updates this variable with the value of the p_array_index, it is kept separately so print shifts can happen in batches and it won't be visible to the print thread till flush is called
     std::atomic<int64_t> write_index = 0ll;
-
-    // this variable is used to indicate that print shifting has gotten to the end of the ponter array and wrapped around to the start of the array
-    bool wrap = false;
 
     // this variable indicates the index in the pointer_array where the next entry should be entered - this is the effective location the print shift thread writes to
     int64_t p_array_index = 0ll;
