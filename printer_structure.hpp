@@ -48,6 +48,9 @@ private:
             uint64_t x_uint64;
         }
 
+        // the data end member holds the data write unmasked value for a char* write, thisis published to the data_read variable after the print thread has read it
+        int64_t data_end = 0ll;
+
     };
 
     // we define the Printer endl tag
@@ -93,19 +96,13 @@ private:
 
 private: 
 
-    // this variable when updated holds the index of the pointer_array where the next write should occur, it is made atomic so once it is updated the change is visible to all threads
+    // this variable when updated holds the index of the pointer_array where the next write should occur, it is made atomic so once it is updated the change is visible to all threads - the flush function updates this variable with the value of the p_array_index, it is kept separately so print shifts can happen in batches and it won't be visible to the print thread till flush is called
     std::atomic<int64_t> write_index = 0ll;
-
-    // this cursor is used to indicate the next write location in the internal buffer
-    char* buffer_cursor = nullptr;
-
-    // this pointer holds the address of the last location in the internal buffer
-    char* end_of_buffer = nullptr;
 
     // this variable is used to indicate that print shifting has gotten to the end of the ponter array and wrapped around to the start of the array
     bool wrap = false;
 
-    // this variable indicates the index in the pointer_array where the next entry should be entered
+    // this variable indicates the index in the pointer_array where the next entry should be entered - this is the effective location the print shift thread writes to
     int64_t p_array_index = 0ll;
 
     // this variable holds the pointer_array index where the next read should be read from - this is an atomic variable so the write thread can know when the pointer array is full
@@ -146,7 +143,7 @@ public:
     // print shift functions
 
     // char* print shift function
-    Printer& print_shift(const char* data, int length_of_data);
+    Printer& print_shift(const char* data);
 
     // int print shift function
     Printer& print_shift(int x);

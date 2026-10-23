@@ -63,8 +63,8 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
         // only continue if no error
         if(!error){
 
-            // we update our data buffer size if it is > our current data buffer size
-            if(data_buffer_size > SIZE_OF_BUFFER){
+            // we update our data buffer size if it is > our current data buffer size and is a power of 2 else we fall back to our default buffer size
+            if(data_buffer_size > SIZE_OF_BUFFER && ((data_buffer_size & (data_buffer_size - 1)) == 0ll)){
 
                 SIZE_OF_BUFFER = data_buffer_size;
 
@@ -85,12 +85,6 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
 
             // only continue if no error
             if(!error){
-
-                // we update our buffer cursor
-                buffer_cursor = buffer;
-
-                // we update our end of buffer variable
-                end_of_buffer = &buffer[SIZE_OF_BUFFER - 1];
 
                 // we update our scratchpad size if it is > our current scratchpad size
                 if(scratchpad_size > SIZE_OF_SCRATCHPAD){
@@ -453,184 +447,210 @@ void Printer::print(){
 
 }
 
-Printer& Printer::print_shift(const char* data, int length_of_data){
+Printer& Printer::print_shift(const char* data){
 // print_shift function for printshifting strings
 
-    // we first check if the string length can be contained in the available space before the end of the internal buffer
+    // only continue if no error
+    if(!error){
 
-    if(length_of_data + 1 < end_of_buffer - (char*)buffer_cursor){
-    // getting here the data can be contained in the free available space before the end of the buffer
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) >= SIZE_OF_POINTER_ARRAY){
 
-        // copy the data to the internal buffer
-        memcpy(buffer_cursor, data, length_of_data);
+            // getting here we have free space in our pointer array so we compute the length of this string
+            int64_t len = strlen(data);
 
-        // we store the location and type of this entry in the pointer array
-        pointer_array[p_array_index].type = CHAR;
+            // we fetch our write array index into the pointer array which is our unmasked p_array_index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
 
-        pointer_array[p_array_index].pointer = buffer_cursor;
+            // we first check if the string length can be contained in the available space before the end of the internal buffer
+            if(length_of_data + 1 < end_of_buffer - (char*)buffer_cursor){
+            // getting here the data can be contained in the free available space before the end of the buffer
 
-        // we move the cursor to point to the next free location
-        buffer_cursor = (char*)buffer_cursor + length_of_data;
+                // copy the data to the internal buffer
+                memcpy(buffer_cursor, data, length_of_data);
 
-        // we store the null byte at this location
-        *(char*)buffer_cursor = '\0';
+                // we store the location and type of this entry in the pointer array
+                pointer_array[p_array_index].type = CHAR;
 
-        // we move the cursor to point to the next free location
-        buffer_cursor = (char*)buffer_cursor + sizeof(char);
+                pointer_array[p_array_index].pointer = buffer_cursor;
 
-        // we now increment p_array_index
-        if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-        // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-            wrap = true;
+                // we move the cursor to point to the next free location
+                buffer_cursor = (char*)buffer_cursor + length_of_data;
 
-            // we wrap the p_array_index around the pointer array
-            p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
+                // we store the null byte at this location
+                *(char*)buffer_cursor = '\0';
 
-            // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
-            flush();
+                // we move the cursor to point to the next free location
+                buffer_cursor = (char*)buffer_cursor + sizeof(char);
 
-        }
-        else
-            // we increment our p_array_index
-            p_array_index++;
+                // we now increment p_array_index
+                if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
+                // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
+                    wrap = true;
 
-    }
-    else if(length_of_data + 1 < SIZE_OF_BUFFER){
-    // getting here the data cannot be contained in the remaining available space in the internal buffer but the length of data is less than the size of the internal buffer
+                    // we wrap the p_array_index around the pointer array
+                    p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
 
-        // first we flush whatever data has been written to the internal buffer but not flushed yet
-        flush();
+                    // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
+                    flush();
 
-        // now we set the buffer_cursor to the start location of the internal buffer
-        buffer_cursor = buffer;
-
-        // copy the data to the internal buffer
-        memcpy(buffer_cursor, data, length_of_data);
-
-        // we store the location and type of this entry in the pointer array
-        pointer_array[p_array_index].type = CHAR;
-
-        pointer_array[p_array_index].pointer = buffer_cursor;
-
-        // we move the cursor to point to the next free location
-        buffer_cursor = (char*)buffer_cursor + length_of_data;
-
-        // we store the null byte at this location
-        *(char*)buffer_cursor = '\0';
-
-        // we move the cursor to point to the next free location
-        buffer_cursor = (char*)buffer_cursor + sizeof(char);
-
-        // we now increment p_array_index
-        if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-        // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-            wrap = true;
-                    
-            // we wrap the p_array_index around the pointer array
-            p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-            // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
-            flush();
-
-        }
-        else
-            // we increment our p_array_index
-            p_array_index++;
-
-
-    }
-    else{
-    // getting here the length of data is larger than the size of the entire internal buffer so we write to the internal buffer in batches calling flush after every write
-
-        // first we flush whatever data has been written to the internal buffer but not flushed yet
-        flush();
-
-        // now we set the buffer_cursor to the start location of the internal buffer
-        buffer_cursor = buffer;
-
-        // we null terminate the end of the buffer before going into the loop
-        buffer[SIZE_OF_BUFFER - 1] = '\0';
-
-        // we use a local variable to keep track of how much data we have left to print
-        int length_of_remaining_data = length_of_data;
-
-        while(SIZE_OF_BUFFER < length_of_remaining_data + 1){
-        // we keep looping till the length of data remaining can fit completely into the data buffer
-
-            // copy a batch of data to the internal buffer
-            memcpy(buffer_cursor, data, SIZE_OF_BUFFER - 1); // we leave a space for the null byte so we do not overwrite it
-
-            // we store the location and type of this entry in the pointer array
-            pointer_array[p_array_index].type = CHAR;
-
-            pointer_array[p_array_index].pointer = buffer_cursor;
-
-            // here buffer_cursor would still be pointing to the start location of the internal buffer
-
-            // we now increment p_array_index
-            if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-            // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-                wrap = true;
-                        
-                // we wrap the p_array_index around the pointer array
-                p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-                // we don't call flush here since flush is called after every write to the internal buffer
+                }
+                else
+                    // we increment our p_array_index
+                    p_array_index++;
 
             }
-            else
-                // we increment our p_array_index
-                p_array_index++;
+            else if(length_of_data + 1 < SIZE_OF_BUFFER){
+            // getting here the data cannot be contained in the remaining available space in the internal buffer but the length of data is less than the size of the internal buffer
 
-            // we flush the written data
-            flush();
+                // first we flush whatever data has been written to the internal buffer but not flushed yet
+                flush();
 
-            // we update the length of remaining data
-            length_of_remaining_data -= SIZE_OF_BUFFER - 1;
+                // now we set the buffer_cursor to the start location of the internal buffer
+                buffer_cursor = buffer;
 
-        }
+                // copy the data to the internal buffer
+                memcpy(buffer_cursor, data, length_of_data);
 
-        // getting here the remaining data can now fit into the internal buffer
+                // we store the location and type of this entry in the pointer array
+                pointer_array[p_array_index].type = CHAR;
 
-        // buffer_cursor would still be pointing to the start of the internal buffer
+                pointer_array[p_array_index].pointer = buffer_cursor;
 
-        // we first check that the length of the remaining data is > 0
-        if(length_of_remaining_data > 0){
+                // we move the cursor to point to the next free location
+                buffer_cursor = (char*)buffer_cursor + length_of_data;
 
-            // copy the data to the internal buffer
-            memcpy(buffer_cursor, data, length_of_remaining_data);
+                // we store the null byte at this location
+                *(char*)buffer_cursor = '\0';
 
-            // we store the location and type of this entry in the pointer array
-            pointer_array[p_array_index].type = CHAR;
+                // we move the cursor to point to the next free location
+                buffer_cursor = (char*)buffer_cursor + sizeof(char);
 
-            pointer_array[p_array_index].pointer = buffer_cursor;
+                // we now increment p_array_index
+                if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
+                // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
+                    wrap = true;
+                            
+                    // we wrap the p_array_index around the pointer array
+                    p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
 
-            // we move the cursor to point to the next free location
-            buffer_cursor = (char*)buffer_cursor + length_of_data;
+                    // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
+                    flush();
 
-            // we store the null byte at this location
-            *(char*)buffer_cursor = '\0';
+                }
+                else
+                    // we increment our p_array_index
+                    p_array_index++;
 
-            // we move the cursor to point to the next free location
-            buffer_cursor = (char*)buffer_cursor + sizeof(char);
-
-            // we now increment p_array_index
-            if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-            // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-                wrap = true;
-                        
-                // we wrap the p_array_index around the pointer array
-                p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-                // we don't call flush here because flush is called after the write to the internal buffer
 
             }
-            else
-                // we increment our p_array_index
-                p_array_index++;
+            else{
+            // getting here the length of data is larger than the size of the entire internal buffer so we write to the internal buffer in batches calling flush after every write
 
-            // we flush the written data
-            flush();
+                // first we flush whatever data has been written to the internal buffer but not flushed yet
+                flush();
+
+                // now we set the buffer_cursor to the start location of the internal buffer
+                buffer_cursor = buffer;
+
+                // we null terminate the end of the buffer before going into the loop
+                buffer[SIZE_OF_BUFFER - 1] = '\0';
+
+                // we use a local variable to keep track of how much data we have left to print
+                int length_of_remaining_data = length_of_data;
+
+                while(SIZE_OF_BUFFER < length_of_remaining_data + 1){
+                // we keep looping till the length of data remaining can fit completely into the data buffer
+
+                    // copy a batch of data to the internal buffer
+                    memcpy(buffer_cursor, data, SIZE_OF_BUFFER - 1); // we leave a space for the null byte so we do not overwrite it
+
+                    // we store the location and type of this entry in the pointer array
+                    pointer_array[p_array_index].type = CHAR;
+
+                    pointer_array[p_array_index].pointer = buffer_cursor;
+
+                    // here buffer_cursor would still be pointing to the start location of the internal buffer
+
+                    // we now increment p_array_index
+                    if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
+                    // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
+                        wrap = true;
+                                
+                        // we wrap the p_array_index around the pointer array
+                        p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
+
+                        // we don't call flush here since flush is called after every write to the internal buffer
+
+                    }
+                    else
+                        // we increment our p_array_index
+                        p_array_index++;
+
+                    // we flush the written data
+                    flush();
+
+                    // we update the length of remaining data
+                    length_of_remaining_data -= SIZE_OF_BUFFER - 1;
+
+                }
+
+                // getting here the remaining data can now fit into the internal buffer
+
+                // buffer_cursor would still be pointing to the start of the internal buffer
+
+                // we first check that the length of the remaining data is > 0
+                if(length_of_remaining_data > 0){
+
+                    // copy the data to the internal buffer
+                    memcpy(buffer_cursor, data, length_of_remaining_data);
+
+                    // we store the location and type of this entry in the pointer array
+                    pointer_array[p_array_index].type = CHAR;
+
+                    pointer_array[p_array_index].pointer = buffer_cursor;
+
+                    // we move the cursor to point to the next free location
+                    buffer_cursor = (char*)buffer_cursor + length_of_data;
+
+                    // we store the null byte at this location
+                    *(char*)buffer_cursor = '\0';
+
+                    // we move the cursor to point to the next free location
+                    buffer_cursor = (char*)buffer_cursor + sizeof(char);
+
+                    // we now increment p_array_index
+                    if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
+                    // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
+                        wrap = true;
+                                
+                        // we wrap the p_array_index around the pointer array
+                        p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
+
+                        // we don't call flush here because flush is called after the write to the internal buffer
+
+                    }
+                    else
+                        // we increment our p_array_index
+                        p_array_index++;
+
+                    // we flush the written data
+                    flush();
+
+                }
+
+            }
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
 
         }
 
