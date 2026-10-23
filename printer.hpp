@@ -307,6 +307,9 @@ void Printer::print(){
 
                 }
 
+                // now we update our data read varible with the data end value at this pointer location
+                data_read.store(pointer_array[r_array_index].data_end, std::memory_order_release);
+
             }
             else if(pointer_array[r_array_index].type == INTEGER){
             // this is a int* so we perform the necessary type casting
