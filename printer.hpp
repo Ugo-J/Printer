@@ -799,3 +799,353 @@ Printer& Printer::print_shift(EndlTag endl_tag){
     return *this;
 
 }
+
+Printer& Printer::operator<<(const char* data){
+// operator<< function for printshifting strings
+
+    // only continue if no error
+    if(!error){
+
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // we check if the supplied parameter is a nullptr and return if it is
+            if(data == nullptr) return *this;
+
+            // getting here we have free space in our pointer array so we compute the length of this string
+            int64_t len = strlen(data);
+
+            // we compute the used space in our data buffer
+            int64_t used_space = data_write - data_read.load(std::memory_order_acquire);
+
+            // if the free space (data array size - used space) is < len + 1 we flush data if unflushed, drop this data, increment our dropped data and return - we add 1 to the string length to account for the null byte
+            if(SIZE_OF_BUFFER - used_space < len + 1){
+
+                // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+                if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+                dropped_data++;
+                return *this;
+
+            }
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we compute the required space for this string - we compute this differently from the value the free space is compared to above because if our required space isn't contiguous we would update it in place
+            int64_t required_space = len + 1;
+
+            // we fetch our write array index into the data buffer which is our unmasked data_write
+            int64_t w_buffer_index = data_write & (SIZE_OF_BUFFER - 1);
+
+            // we now check if the contiguous space from our write buffer index to the end of our data buffer is sufficient to hold this char* string - if it isn't we add the contiguous space to our required space and set our buffer index to 0
+            if(w_buffer_index + required_space > SIZE_OF_BUFFER){
+
+                required_space += SIZE_OF_BUFFER - w_buffer_index;
+                w_buffer_index = 0ll;
+
+            }
+
+            // now we check if our used space + required space > SIZE_OF_BUFFER, if it is then we don't have sufficient contiguous space for this char* string so we we flush data if unflushed, drop the data, increment our dropped data counter and return
+            if(used_space + required_space > SIZE_OF_BUFFER){
+
+                // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+                if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+                dropped_data++;
+                return *this;
+
+            }
+
+            // getting here we can enter this data into our buffer
+
+            // we compute our destination pointer from our write buffer index
+            char* p_dest = buffer + w_buffer_index;
+
+            // we store the location and type of this entry in the pointer array
+            pointer_array[w_array_index].type = CHAR;
+
+            pointer_array[w_array_index].pointer = p_dest;
+
+            // we copy our data to the internal buffer
+            memcpy(p_dest, data, len);
+
+            // we increment our p_dest pointer by our data len so we can null terminate our data
+            p_dest += len;
+
+            // we null terminate our data
+            *p_dest++ = '\0';
+
+            // we now update our data write counter by adding our required space to it
+            data_write += required_space;
+
+            // we set our data end variable in our pointer array entry to our updated data_write variable
+            pointer_array[w_array_index].data_end = data_write;
+
+            // finally we increment our p_array_index variable
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+
+    }
+
+    return *this;
+
+}
+
+Printer& Printer::operator<<(int x){
+// operator<< function for printshifting integers
+
+    // only continue if no error
+    if(!error){
+
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = INTEGER;
+
+            pointer_array[w_array_index].x_int = x;
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
+    
+    return *this;
+
+}
+
+Printer& Printer::operator<<(unsigned int x){
+// operator<< function for printshifting integers
+
+    // only continue if no error
+    if(!error){
+
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = UNSIGNED_INTEGER;
+
+            pointer_array[w_array_index].x_uint = x;
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
+    
+    return *this;
+
+}
+
+Printer& Printer::operator<<(int64_t x){
+// operator<< function for printshifting integers
+
+    // only continue if no error
+    if(!error){
+
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = INT64;
+
+            pointer_array[w_array_index].x_int64 = x;
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
+    
+    return *this;
+
+}
+
+Printer& Printer::operator<<(uint64_t x){
+// operator<< function for printshifting integers
+
+    // only continue if no error
+    if(!error){
+
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = UINT64;
+
+            pointer_array[w_array_index].x_uint64 = x;
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
+    
+    return *this;
+
+}
+
+Printer& Printer::operator<<(double x){
+// operator<< function for printshifting integers
+
+    // only continue if no error
+    if(!error){
+
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = DOUBLE;
+
+            pointer_array[w_array_index].x_double = x;
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
+    
+    return *this;
+
+}
+
+Printer& Printer::operator<<(EndlTag endl_tag){
+
+    // only continue if no error
+    if(!error){
+
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = ENDL;
+
+            // for the ENDL type we flush any data written to the pointer array so they become visible to the print thread - the endl type does not have a corresponding value to be written to the pointer array
+            flush();
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
+    
+    return *this;
+
+}

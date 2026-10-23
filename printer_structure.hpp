@@ -11,6 +11,9 @@ public:
     // destructor
     ~Printer();
 
+    // we define the Printer endl tag
+    static constexpr struct EndlTag {} endl{};
+
 private:
 
     // stdout file descriptor
@@ -52,9 +55,6 @@ private:
         int64_t data_end = 0ll;
 
     };
-
-    // we define the Printer endl tag
-    static constexpr struct EndlTag {} endl{};
 
 private:
 
@@ -159,6 +159,31 @@ public:
 
     // endl print shift function
     Printer& print_shift(EndlTag endl_tag);
+
+public:
+
+    // print shift operator<< functions
+
+    // char* print shift operator<< function
+    Printer& operator<<(const char* data);
+
+    // int print shift operator<< function
+    Printer& operator<<(int x);
+
+    // unsigned int print shift operator<< function
+    Printer& operator<<(unsigned int x);
+
+    // int64 print shift operator<< function
+    Printer& operator<<(int64_t x);
+
+    // uint64 print shift operator<< function
+    Printer& operator<<(uint64_t x);
+
+    // double print shift operator<< function
+    Printer& operator<<(double x);
+
+    // endl print shift operator<< function
+    Printer& operator<<(EndlTag endl_tag);
 
 };
 
