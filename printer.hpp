@@ -598,57 +598,40 @@ Printer& Printer::print_shift(int x){
 Printer& Printer::print_shift(unsigned int x){
 // function for printshifting integers
 
-    size_t free_space = end_of_buffer - (char*)buffer_cursor;
+    // only continue if no error
+    if(!error){
 
-    // we attempt to align the buffer cursor
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = UNSIGNED_INTEGER;
+
+            pointer_array[w_array_index].x_uint = x;
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
     
-    // we check if the returned value is null which would mean that the size of the remaining space in the internal buffer is not enough to hold an unsigned int
-    if(std::align(alignof(unsigned int), sizeof(unsigned int), buffer_cursor, free_space) == nullptr){
-    // buffer_cursor is null so we set buffer_cursor to the start of the internal buffer and call align again
-
-        // we first flush any unprinted data
-        flush();
-
-        // we store the size of the internal buffer in the free space variable
-        free_space = (size_t)SIZE_OF_BUFFER;
-
-        buffer_cursor = buffer;
-
-        // we align the buffer cursor
-        std::align(alignof(unsigned int), sizeof(unsigned int), buffer_cursor, free_space);
-
-        // now align is bound to succeed
-
-    }
-
-    // store the unsigned integer in the internal buffer
-    *(unsigned int*)buffer_cursor = x;
-
-    // we store the location and type of this entry in the pointer array
-    pointer_array[p_array_index].type = UNSIGNED_INTEGER;
-
-    pointer_array[p_array_index].pointer = buffer_cursor;
-
-    // we move the cursor to point to the next free location
-    buffer_cursor = (char*)buffer_cursor + sizeof(unsigned int);
-
-    // we now increment p_array_index
-    if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-    // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-        wrap = true;
-                
-        // we wrap the p_array_index around the pointer array
-        p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-        // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
-        flush();
-
-    }
-    else
-        // we increment our p_array_index
-        p_array_index++;
-
-
     return *this;
 
 }
