@@ -535,185 +535,6 @@ Printer& Printer::print_shift(const char* data){
             // finally we increment our p_array_index variable
             p_array_index++;
 
-            // we first check if the string length can be contained in the available space before the end of the internal buffer
-            if(length_of_data + 1 < end_of_buffer - (char*)buffer_cursor){
-            // getting here the data can be contained in the free available space before the end of the buffer
-
-                // copy the data to the internal buffer
-                memcpy(buffer_cursor, data, length_of_data);
-
-                // we store the location and type of this entry in the pointer array
-                pointer_array[p_array_index].type = CHAR;
-
-                pointer_array[p_array_index].pointer = buffer_cursor;
-
-                // we move the cursor to point to the next free location
-                buffer_cursor = (char*)buffer_cursor + length_of_data;
-
-                // we store the null byte at this location
-                *(char*)buffer_cursor = '\0';
-
-                // we move the cursor to point to the next free location
-                buffer_cursor = (char*)buffer_cursor + sizeof(char);
-
-                // we now increment p_array_index
-                if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-                // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-                    wrap = true;
-
-                    // we wrap the p_array_index around the pointer array
-                    p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-                    // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
-                    flush();
-
-                }
-                else
-                    // we increment our p_array_index
-                    p_array_index++;
-
-            }
-            else if(length_of_data + 1 < SIZE_OF_BUFFER){
-            // getting here the data cannot be contained in the remaining available space in the internal buffer but the length of data is less than the size of the internal buffer
-
-                // first we flush whatever data has been written to the internal buffer but not flushed yet
-                flush();
-
-                // now we set the buffer_cursor to the start location of the internal buffer
-                buffer_cursor = buffer;
-
-                // copy the data to the internal buffer
-                memcpy(buffer_cursor, data, length_of_data);
-
-                // we store the location and type of this entry in the pointer array
-                pointer_array[p_array_index].type = CHAR;
-
-                pointer_array[p_array_index].pointer = buffer_cursor;
-
-                // we move the cursor to point to the next free location
-                buffer_cursor = (char*)buffer_cursor + length_of_data;
-
-                // we store the null byte at this location
-                *(char*)buffer_cursor = '\0';
-
-                // we move the cursor to point to the next free location
-                buffer_cursor = (char*)buffer_cursor + sizeof(char);
-
-                // we now increment p_array_index
-                if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-                // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-                    wrap = true;
-                            
-                    // we wrap the p_array_index around the pointer array
-                    p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-                    // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
-                    flush();
-
-                }
-                else
-                    // we increment our p_array_index
-                    p_array_index++;
-
-
-            }
-            else{
-            // getting here the length of data is larger than the size of the entire internal buffer so we write to the internal buffer in batches calling flush after every write
-
-                // first we flush whatever data has been written to the internal buffer but not flushed yet
-                flush();
-
-                // now we set the buffer_cursor to the start location of the internal buffer
-                buffer_cursor = buffer;
-
-                // we null terminate the end of the buffer before going into the loop
-                buffer[SIZE_OF_BUFFER - 1] = '\0';
-
-                // we use a local variable to keep track of how much data we have left to print
-                int length_of_remaining_data = length_of_data;
-
-                while(SIZE_OF_BUFFER < length_of_remaining_data + 1){
-                // we keep looping till the length of data remaining can fit completely into the data buffer
-
-                    // copy a batch of data to the internal buffer
-                    memcpy(buffer_cursor, data, SIZE_OF_BUFFER - 1); // we leave a space for the null byte so we do not overwrite it
-
-                    // we store the location and type of this entry in the pointer array
-                    pointer_array[p_array_index].type = CHAR;
-
-                    pointer_array[p_array_index].pointer = buffer_cursor;
-
-                    // here buffer_cursor would still be pointing to the start location of the internal buffer
-
-                    // we now increment p_array_index
-                    if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-                    // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-                        wrap = true;
-                                
-                        // we wrap the p_array_index around the pointer array
-                        p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-                        // we don't call flush here since flush is called after every write to the internal buffer
-
-                    }
-                    else
-                        // we increment our p_array_index
-                        p_array_index++;
-
-                    // we flush the written data
-                    flush();
-
-                    // we update the length of remaining data
-                    length_of_remaining_data -= SIZE_OF_BUFFER - 1;
-
-                }
-
-                // getting here the remaining data can now fit into the internal buffer
-
-                // buffer_cursor would still be pointing to the start of the internal buffer
-
-                // we first check that the length of the remaining data is > 0
-                if(length_of_remaining_data > 0){
-
-                    // copy the data to the internal buffer
-                    memcpy(buffer_cursor, data, length_of_remaining_data);
-
-                    // we store the location and type of this entry in the pointer array
-                    pointer_array[p_array_index].type = CHAR;
-
-                    pointer_array[p_array_index].pointer = buffer_cursor;
-
-                    // we move the cursor to point to the next free location
-                    buffer_cursor = (char*)buffer_cursor + length_of_data;
-
-                    // we store the null byte at this location
-                    *(char*)buffer_cursor = '\0';
-
-                    // we move the cursor to point to the next free location
-                    buffer_cursor = (char*)buffer_cursor + sizeof(char);
-
-                    // we now increment p_array_index
-                    if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-                    // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-                        wrap = true;
-                                
-                        // we wrap the p_array_index around the pointer array
-                        p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-                        // we don't call flush here because flush is called after the write to the internal buffer
-
-                    }
-                    else
-                        // we increment our p_array_index
-                        p_array_index++;
-
-                    // we flush the written data
-                    flush();
-
-                }
-
-            }
-
         }
         else{
 
@@ -736,57 +557,40 @@ Printer& Printer::print_shift(const char* data){
 Printer& Printer::print_shift(int x){
 // function for printshifting integers
 
-    size_t free_space = end_of_buffer - (char*)buffer_cursor;
+    // only continue if no error
+    if(!error){
 
-    // we attempt to align the buffer cursor
+        // we check if we still have free space in our pointer array - since our p_array_index and read index are unmasked counters we simply check the difference between them
+        if(p_array_index - read_index.load(std::memory_order_acquire) < SIZE_OF_POINTER_ARRAY){
+
+            // getting here we have free space in our pointer array
+
+            // we unmask our pointer array index
+            int64_t w_array_index = p_array_index & (SIZE_OF_POINTER_ARRAY - 1);
+
+            // we store the type of this entry and the data value
+            pointer_array[w_array_index].type = INTEGER;
+
+            pointer_array[w_array_index].x_int = x;
+
+            // we increment our p_array_index
+            p_array_index++;
+
+        }
+        else{
+
+            // getting here our pointer array is full so we first check if the data in the pointer array has been flushed if it hasn't then we flush it to make it visible to the print thread, we then ignore this data and increment our dropped data counter
+
+            // we load our write index with std::memory_order_relaxed because it is written to by the same thread calling the print shift function
+            if(p_array_index != write_index.load(std::memory_order_relaxed)) flush();
+
+            // we increment our dropped data counter
+            dropped_data++;
+
+        }
+        
+    }
     
-    // we check if the returned value is null which would mean that the size of the remaining space in the internal buffer is not enough to hold an int
-    if(std::align(alignof(int), sizeof(int), buffer_cursor, free_space) == nullptr){
-    // buffer_cursor is null so we set buffer_cursor to the start of the internal buffer and call align again
-
-        // we first flush any unprinted data
-        flush();
-
-        // we store the size of the internal buffer in the free space variable
-        free_space = (size_t)SIZE_OF_BUFFER;
-
-        buffer_cursor = buffer;
-
-        // we align the buffer cursor
-        std::align(alignof(int), sizeof(int), buffer_cursor, free_space);
-
-        // now align is bound to succeed
-
-    }
-
-    // store the integer in the internal buffer
-    *(int*)buffer_cursor = x;
-
-    // we store the location and type of this entry in the pointer array
-    pointer_array[p_array_index].type = INTEGER;
-
-    pointer_array[p_array_index].pointer = buffer_cursor;
-
-    // we move the cursor to point to the next free location
-    buffer_cursor = (char*)buffer_cursor + sizeof(int);
-
-    // we now increment p_array_index
-    if( !((p_array_index + 1) < SIZE_OF_POINTER_ARRAY) ){
-    // we test whether adding 1 to the current pointer array index would cause it to wrap around the pointer array, if so we set the wrap variable to true
-        wrap = true;
-
-        // we wrap the p_array_index around the pointer array
-        p_array_index = (p_array_index + 1) % SIZE_OF_POINTER_ARRAY;
-
-        // we flush now so that everything written since the last flush would become visible to the printing thread after the wrap around including the wrap variable's new value
-        flush();
-
-    }
-    else
-        // we increment our p_array_index
-        p_array_index++;
-
-
     return *this;
 
 }
@@ -1021,4 +825,9 @@ Printer& Printer::print_shift(double x){
     
     return *this;
 
+}
+
+Printer& Printer::print_shift(EndlTag endl_tag){
+
+    return *this;
 }

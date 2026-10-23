@@ -160,5 +160,8 @@ public:
     // double print shift function
     Printer& print_shift(double x);
 
+    // endl print shift function
+    Printer& print_shift(EndlTag endl_tag);
+
 };
 
