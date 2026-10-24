@@ -1,274 +1,235 @@
-# PrintShift
+# Locklog
 
-A high-performance C++ library that moves printing operations off the hot path by buffering output and deferring actual I/O to a separate thread.
+A header-only C++ logging library that keeps printing off your hot path. The producer thread copies values into a lock-free ring buffer. A separate thread formats them and writes them out in large batches.
 
 ## Overview
 
-PrintShift is a header-only library designed to minimize the performance impact of logging and debugging output in performance-critical applications. Instead of blocking your main thread with I/O operations, PrintShift buffers data in memory and allows a separate thread to handle the actual printing asynchronously.
+Printing from a latency-sensitive thread is expensive. `std::cout` builds a sentry object, goes through locale machinery, and often ends in a syscall per line. Locklog avoids all of that on the producer side. The hot thread does a bounds check, a `memcpy` or a single store, and moves on. Formatting and I/O happen on whichever thread calls `print()`.
 
 ## Key Features
 
-- **Lock-free design**: Uses atomic operations for thread synchronization
-- **Zero-copy buffering**: Stores data directly in an internal buffer
-- **Type-safe**: Supports multiple data types with proper alignment
-- **Minimal overhead**: Defers expensive I/O operations to a separate thread
-- **Large data handling**: Automatically handles strings larger than the internal buffer
-- **Header-only**: Easy integration into existing projects
+- **Single-producer, single-consumer, lock-free.** Synchronisation uses acquire/release atomics on two unmasked counters, with no mutexes.
+- **Values are copied at call time.** Strings are copied into an internal ring buffer, and numbers are stored by value inside the entry. Changing or destroying your variable after the call is safe.
+- **Fast formatting.** Numbers are formatted with `std::to_chars` straight into the output buffer, with no locale work and no allocation.
+- **Batched output.** Everything is assembled in a 1 MB scratchpad (configurable) and sent with a single `write` call per batch.
+- **Never blocks the producer.** When a ring is full, the new entry is dropped and counted rather than stalling your thread.
+- **Optional prelude.** A fixed string (a tag or timestamp label, for example) is placed at the start of every output chunk.
+- **Stream-style syntax.** Every `print_shift` overload has a matching `operator<<`, so `log << "x = " << x << Lock_logger::endl` reads like `std::cout`. Both forms return `*this`, so they chain.
+- **Header-only.** All out-of-class definitions are `inline`, so the header can be included from several translation units without link errors.
 
-## Supported Data Types
+## Supported Types
 
-- `const char*` (C-strings)
+- `const char*` (null-terminated C strings)
 - `int`
 - `unsigned int`
 - `int64_t`
 - `uint64_t`
 - `double`
+- `Lock_logger::endl`, a tag that appends a newline, publishes everything queued so far to the consumer, and causes the scratchpad to be written out
+
+## Requirements
+
+- C++17 or later (`std::to_chars`)
+- GCC 11 or later, or a recent Clang with a standard library that supports floating-point `std::to_chars`
+- A POSIX system (Linux or macOS), since output goes through `write(2)` and `<unistd.h>`
+
+```bash
+g++ -std=c++17 -O2 -pthread your_program.cpp -o your_program
+```
 
 ## How It Works
 
-PrintShift uses a dual-buffer architecture:
+Locklog uses two rings and one staging buffer.
 
-1. **Internal Buffer** (64 KB): Stores the actual data (strings, numbers, etc.)
-2. **Pointer Array** (32K entries): Stores metadata about each buffered item (type and location)
+1. **Pointer array.** A ring of fixed-size entries. Each entry holds a type tag and either the value itself (numbers) or a position in the data buffer (strings).
+2. **Data buffer.** A ring of bytes that holds string contents, each stored with its null terminator. A string is always stored contiguously, so if it would straddle the end of the buffer the producer skips to the start and the skipped tail counts as used space.
+3. **Scratchpad.** A linear buffer owned by the consumer. `print()` formats entries into it and writes it out when it fills, when an `endl` entry arrives, or when a string is too large to stage.
 
-The writer thread calls `print_shift()` to buffer data, then `flush()` to make it visible. A separate reader thread calls `print()` to output the buffered data to `std::cout`.
+Both rings use unmasked, ever-increasing 64-bit counters. A counter is masked with `& (SIZE - 1)` only when an actual position is needed, so sizes must be powers of two. Because the counters are never masked, an empty ring and a full ring are always distinguishable.
 
-### Thread Safety
+### Producer and consumer
 
-- The `write_index` is atomic, ensuring visibility across threads
-- The writer updates `p_array_index` locally and atomically publishes via `flush()`
-- The reader uses `read_index` to track its position
-- The `wrap` flag handles circular buffer wraparound
+| Thread | Calls | Does |
+|---|---|---|
+| Producer | `print_shift(...)`, `flush()` | Copies the value into the rings, publishes with `flush()` |
+| Consumer | `print()` | Formats pending entries and writes them out |
+
+Entries are not visible to the consumer until they are published with a release store to `write_index`. `flush()` does this explicitly, and `Lock_logger::endl` does it implicitly, so a line that ends in `endl` needs no separate `flush()` call.
+
+### Memory ordering
+
+- The producer fills an entry, then publishes `write_index` with `memory_order_release`.
+- The consumer reads `write_index` with `memory_order_acquire`, processes entries, then publishes `read_index` (and `data_read` for string entries) with `memory_order_release`.
+- The producer reads those two with `memory_order_acquire` before reusing any slot or bytes.
+
+A stale view on either side can only make a ring look fuller than it is, so unread data is never overwritten.
 
 ## Usage
 
-### Basic Example
+### Basic example
 
 ```cpp
-#include "printshift.hpp"
+#include "locklog.hpp"
 
 int main() {
-    printer p;
-    
-    // Buffer some data (writer thread)
-    p.print_shift("Hello, ", 7);
-    p.print_shift("World!", 6);
-    p.print_shift(42);
-    p.flush();  // Make data visible to reader
-    
-    // Print buffered data (reader thread)
-    p.print();  // Outputs: Hello, World!42
-    
+    Lock_logger log("[log] ", /* TODO: constructor arguments */);
+
+    // stream style
+    log << "Price: " << 101.5 << Lock_logger::endl;
+
+    // equivalent function-call style
+    log.print_shift("Qty: ").print_shift(10).print_shift(Lock_logger::endl);
+
+    // endl already published everything queued above, so no flush() is needed
+
+    log.print();     // formats and writes the pending entries
+
     return 0;
 }
 ```
 
-### Multi-threaded Example
+### Multi-threaded example
 
 ```cpp
-#include "printshift.hpp"
+#include "locklog.hpp"
 #include <thread>
-#include <chrono>
 
-printer p;
+Lock_logger log("[log] ", /* TODO: constructor arguments */);
+std::atomic<bool> running{true};
 
-void writer_thread() {
-    for (int i = 0; i < 1000; i++) {
-        p.print_shift("Iteration: ", 11);
-        p.print_shift(i);
-        p.print_shift("\n", 1);
-        p.flush();
-        
-        // Do performance-critical work here
-        // without blocking on I/O
+void producer() {
+    for (int i = 0; i < 1000; ++i) {
+        log << "iteration " << i << Lock_logger::endl;   // endl publishes the line
+        // latency-sensitive work continues here
     }
+    running = false;
 }
 
-void reader_thread() {
-    while (true) {
-        p.print();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+void consumer() {
+    while (running.load()) {
+        log.print();
     }
+    log.print();   // drain whatever was published last
 }
 
 int main() {
-    std::thread writer(writer_thread);
-    std::thread reader(reader_thread);
-    
-    writer.join();
-    reader.join();
-    
-    return 0;
+    std::thread p(producer), c(consumer);
+    p.join();
+    c.join();
 }
 ```
+
+Only one thread may call `print_shift` and `flush`, and only one thread may call `print`. Calling them from more than one thread each is undefined behaviour.
 
 ## API Reference
 
-### Class: `printer`
+### `Lock_logger`
 
-#### Methods
+#### `print_shift(const char* data)`
 
-##### `void print_shift(const char* data, int length_of_data)`
+Copies the string, including its terminator, into the data buffer and adds an entry to the pointer array. Returns `*this`.
 
-Buffers a C-string for later printing.
+The entry is dropped and `dropped_data` is incremented if the pointer array is full, if the data buffer does not have enough free bytes (padding included), or if the string is longer than the whole data buffer.
 
-**Parameters:**
-- `data`: Pointer to the string data
-- `length_of_data`: Length of the string (excluding null terminator)
+#### `print_shift(int)`, `print_shift(unsigned int)`, `print_shift(int64_t)`, `print_shift(uint64_t)`, `print_shift(double)`
 
-**Behavior:**
-- Copies the string into the internal buffer
-- Automatically handles strings larger than the buffer size
-- Wraps around when the buffer is full
+Stores the value directly in a pointer array entry. No data buffer space is used. The entry is dropped and counted if the pointer array is full.
 
-**Example:**
+#### `print_shift(Lock_logger::endl)`
+
+Adds an entry telling the consumer to append `'\n'` and write the scratchpad out immediately. It also publishes every entry queued up to and including itself, so no separate `flush()` call is needed after it.
+
+#### `operator<<`
+
 ```cpp
-const char* msg = "Hello";
-p.print_shift(msg, 5);
+Lock_logger& operator<<(const char* data);
+Lock_logger& operator<<(int x);
+Lock_logger& operator<<(unsigned int x);
+Lock_logger& operator<<(int64_t x);
+Lock_logger& operator<<(uint64_t x);
+Lock_logger& operator<<(double x);
+Lock_logger& operator<<(/* endl tag type */);
 ```
 
-##### `void print_shift(int x)`
-##### `void print_shift(unsigned int x)`
-##### `void print_shift(int64_t x)`
-##### `void print_shift(uint64_t x)`
-##### `void print_shift(double x)`
+Each overload forwards to the matching `print_shift`, so it behaves identically, including the drop rules and the counters. It returns a reference to the logger, which is what makes chains like `log << "a" << 1 << 2.0 << Lock_logger::endl` work. The chain is parsed left to right, one call per value.
 
-Buffers a numeric value for later printing.
+A few things to know:
 
-**Parameters:**
-- `x`: The numeric value to buffer
+- **Chaining is not atomic.** Each `<<` is a separate entry. Since there is a single producer thread this does not matter for ordering, but a drop can happen in the middle of a chain if a ring fills up, leaving a partial line.
+- **No iostream manipulators.** `std::endl`, `std::hex`, `std::setw` and similar are not supported. Use `Lock_logger::endl` for a newline.
+- **Wrap ternaries in brackets.** `?:` has lower precedence than `<<`, so write `log << (ok ? "yes" : "no")`.
+- **Publishing.** Like `print_shift`, `<<` only queues the entry. Entries become visible to the consumer when `Lock_logger::endl` is queued or when you call `flush()`. A line that does not end in `endl` needs an explicit `flush()`.
 
-**Behavior:**
-- Stores the value with proper alignment in the internal buffer
-- Automatically wraps to the beginning if insufficient space remains
+#### `flush()`
 
-**Example:**
-```cpp
-p.print_shift(42);
-p.print_shift(3.14159);
-p.print_shift((uint64_t)1234567890);
-```
+Publishes every entry added since the last flush by storing the producer's counter into `write_index` with release ordering. Until this runs, the consumer cannot see those entries. You only need to call it yourself for output that does not end in `Lock_logger::endl`, since `endl` publishes on its own.
 
-##### `void flush()`
+#### `print()`
 
-Makes all buffered data visible to the reader thread.
+Consumer side. Processes every published entry:
 
-**Behavior:**
-- Atomically updates `write_index` to match `p_array_index`
-- Must be called after `print_shift()` operations to make data visible
-- Automatically called during buffer wraparound
+- Strings are copied into the scratchpad.
+- Numbers are formatted into the scratchpad with `std::to_chars`.
+- `endl` appends a newline and writes the scratchpad out.
+- When the scratchpad cannot hold the next item, it is written out first and the item goes into the emptied scratchpad.
+- A string that cannot fit in an empty scratchpad (after the prelude) is written straight to the output descriptor.
 
-**Example:**
-```cpp
-p.print_shift("Data", 4);
-p.flush();  // Now visible to print()
-```
+The scratchpad is also written out at the end of the call if it is completely full. Otherwise, partially filled data stays staged until the next `endl`, a full scratchpad, or the destructor.
 
-##### `void print()`
+#### Counters
 
-Outputs all visible buffered data to `std::cout`.
-
-**Behavior:**
-- Reads from `read_index` up to `write_index`
-- Handles circular buffer wraparound
-- Type-casts and prints each item according to its stored type
-- Non-blocking: only prints what's currently visible
-
-**Example:**
-```cpp
-p.print();  // Outputs all flushed data
-```
+| Member | Meaning |
+|---|---|
+| `dropped_data` | Entries discarded on the producer side because a ring was full or a string was too large |
+| `failed_writes` | `write` calls that failed with an error other than `EINTR`. The affected entry is treated as consumed |
 
 ## Configuration
 
-### Buffer Sizes
+Sizes are set at compile time in `locklog.hpp`. The ring sizes must be powers of two.
 
-The library uses compile-time constants that can be modified in `printshift.hpp`:
+| Constant | Purpose | Default |
+|---|---|---|
+| `SIZE_OF_SCRATCHPAD` | Staging buffer for output batches | 1 MB |
+| `SIZE_OF_BUFFER` | Ring buffer holding string data | TODO |
+| `SIZE_OF_POINTER_ARRAY` | Number of ring entries | TODO |
+| `MIN_NUM_SPACE` | Minimum free scratchpad bytes required before formatting a number | 30 |
 
-```cpp
-inline static const int SIZE_OF_BUFFER = 64 * 1024;  // 64 KB data buffer
-inline static const int SIZE_OF_POINTER_ARRAY = SIZE_OF_BUFFER/2;  // 32K entries
-```
+A bigger scratchpad means fewer syscalls but longer individual writes and more output sitting unflushed. Sizes in the 128 KB to 1 MB range are worth benchmarking against each other, since smaller buffers can stay cache-warm.
 
-**Considerations:**
-- Larger buffers reduce wraparound frequency but use more memory
-- The pointer array size is set to `SIZE_OF_BUFFER/2` to ensure it can hold metadata for the worst case (all single-character strings)
+## Prelude
 
-## Performance Characteristics
+If a prelude is set, it is copied to the start of the scratchpad whenever the scratchpad is empty. That means one prelude per output chunk, so a long line that triggers a mid-line flush will carry a fresh prelude on its continuation. Set `prelude_len` to 0 when there is no prelude.
 
-### Writer Thread (Hot Path)
+## Behaviour to Be Aware Of
 
-- **Time Complexity**: O(n) where n is the data size
-- **Operations**: Memory copy + pointer arithmetic + occasional atomic store
-- **No I/O blocking**: All expensive operations deferred
-
-### Reader Thread
-
-- **Time Complexity**: O(m) where m is the number of buffered items
-- **Operations**: Type casting + `std::cout` operations
-- **Blocking**: May block on I/O, but doesn't affect writer
-
-## Memory Layout
-
-```
-Internal Buffer (64 KB):
-[string1\0][int][string2\0][double][...]
-     ^      ^       ^         ^
-     |      |       |         |
-Pointer Array:
-[{CHAR, ptr1}, {INT, ptr2}, {CHAR, ptr3}, {DOUBLE, ptr4}, ...]
-```
-
-## Thread Synchronization
-
-The library uses a lock-free synchronization mechanism:
-
-1. Writer increments `p_array_index` locally
-2. Writer calls `flush()` to atomically publish `write_index`
-3. Reader reads `write_index` atomically
-4. Reader processes items from `read_index` to `write_index`
-
-The `wrap` flag ensures proper handling when the circular buffer wraps around.
+- **Output can lag.** Data stays in the scratchpad until an `endl`, a full scratchpad, or the destructor. A crash, `_exit`, `abort` or kill signal loses whatever was staged.
+- **Drops, not stalls.** If the consumer falls behind, new entries are discarded and `dropped_data` goes up. Check it after a run.
+- **Unflushed entries cannot free space.** The consumer only releases ring space for entries it has seen, so end lines with `Lock_logger::endl` or call `flush()` regularly. The library flushes automatically when it finds the pointer array full.
+- **Failed writes lose data.** A write that fails is counted in `failed_writes` and the entry is not retried. With a closed pipe, `SIGPIPE` will kill the process unless you ignore it.
+- **Interleaving.** Locklog writes to the file descriptor directly. Do not mix it with `std::cout` or `printf` on the same stream unless you flush those first, because the two buffer separately.
+- **Number formatting.** Numbers use the shortest round-trip representation from `std::to_chars`. There are no width, precision or base options.
 
 ## Limitations
 
-- **Single writer, single reader**: Not designed for multiple concurrent writers
-- **No backpressure**: If the reader is too slow, old data may be overwritten
-- **Fixed buffer size**: Cannot dynamically grow
-- **No formatting**: Numbers are printed with default `std::cout` formatting
-- **Output to stdout only**: Currently hardcoded to use `std::cout`
+- Single producer, single consumer only
+- Fixed buffer sizes, with no dynamic growth
+- Output to standard output only
+- POSIX only
+- Strings longer than the data buffer are dropped on the producer side
 
-## Best Practices
+## Performance Notes
 
-1. **Call flush() regularly**: Data isn't visible until flushed
-2. **Size your buffer appropriately**: Consider your data volume and reader frequency
-3. **Dedicate a thread to printing**: Run `print()` in a loop on a separate thread
-4. **Handle wraparound**: Ensure your reader keeps up to avoid data loss
-5. **Measure overhead**: Profile to ensure the library provides benefit for your use case
-
-## Use Cases
-
-- High-frequency trading systems
-- Real-time game engines
-- Performance-critical simulations
-- Low-latency network applications
-- Any scenario where logging overhead impacts performance
+- The producer path has no syscalls, no locks and no allocation. A string costs a `strlen`, a capacity check and a `memcpy`. A number costs a capacity check and a store.
+- Place `write_index` and `read_index` on separate cache lines to avoid false sharing between the two threads.
+- For best results, keep the consumer on its own thread so that `write` latency never reaches the producer.
+- Call sites inline fully when the header is included directly, so keep hot-path definitions in the header.
 
 ## Building
 
-This is a header-only library. Simply include the headers:
+Locklog is header-only. Include `locklog.hpp` from as many source files as you like.
 
 ```cpp
-#include "printshift.hpp"
-```
-
-**Requirements:**
-- C++11 or later (for `std::atomic` and `std::align`)
-- Standard library headers: `<memory>`, `<cstring>`, `<iostream>`, `<atomic>`
-
-**Compilation:**
-```bash
-g++ -std=c++11 -pthread your_program.cpp -o your_program
+#include "locklog.hpp"
 ```
 
 ## License
