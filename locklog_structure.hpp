@@ -143,10 +143,10 @@ public:
     Lock_logger& print_shift(const char* data);
 
     // string_view print shift function
-    Lock_logger& print_shift(std::string_view& data);
+    Lock_logger& print_shift(const std::string_view data);
 
     // std::string print shift function
-    Lock_logger& print_shift(std::string& data);
+    Lock_logger& print_shift(const std::string& data);
 
     // int print shift function
     Lock_logger& print_shift(int x);
@@ -174,10 +174,10 @@ public:
     Lock_logger& operator<<(const char* data);
 
     // string_view print shift operator<< function
-    Lock_logger& operator<<(std::string_view& data);
+    Lock_logger& operator<<(const std::string_view data);
 
     // std::string print shift operator<< function
-    Lock_logger& operator<<(std::string& data);
+    Lock_logger& operator<<(const std::string& data);
 
     // int print shift operator<< function
     Lock_logger& operator<<(int x);

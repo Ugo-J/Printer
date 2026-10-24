@@ -554,7 +554,7 @@ inline Lock_logger& Lock_logger::print_shift(const char* data){
 
 }
 
-inline Lock_logger& Lock_logger::print_shift(std::string_view& data){
+inline Lock_logger& Lock_logger::print_shift(const std::string_view data){
 // print_shift function for printshifting std::string_view objects
 
     // only continue if no error
@@ -655,7 +655,7 @@ inline Lock_logger& Lock_logger::print_shift(std::string_view& data){
 
 }
 
-inline Lock_logger& Lock_logger::print_shift(std::string& data){
+inline Lock_logger& Lock_logger::print_shift(const std::string& data){
 // print_shift function for printshifting std::string objects
 
     // only continue if no error
@@ -1106,7 +1106,7 @@ inline Lock_logger& Lock_logger::operator<<(const char* data){
 
 }
 
-inline Lock_logger& Lock_logger::operator<<(std::string_view& data){
+inline Lock_logger& Lock_logger::operator<<(const std::string_view data){
 // operator<< function for printshifting std::string_view objects
 
     // only continue if no error
@@ -1207,7 +1207,7 @@ inline Lock_logger& Lock_logger::operator<<(std::string_view& data){
 
 }
 
-inline Lock_logger& Lock_logger::operator<<(std::string& data){
+inline Lock_logger& Lock_logger::operator<<(const std::string& data){
 // operator<< function for printshifting std::string objects
 
     // only continue if no error
