@@ -4,7 +4,7 @@
 #include "locklog_structure.hpp"
 
 // constructor
-inline Lock_logger::Lock_logger(char* prelude_string, int64_t pointer_array_size, int64_t data_buffer_size, int64_t scratchpad_size){
+inline Lock_logger::Lock_logger(const char* prelude_string, int64_t pointer_array_size, int64_t data_buffer_size, int64_t scratchpad_size){
 
     // we allocate and store our prelude if not null
     if(prelude_string != nullptr){
