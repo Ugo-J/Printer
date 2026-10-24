@@ -6,7 +6,7 @@ class Lock_logger{
 public:
 
     // constructor
-    Lock_logger(char* prelude_string = nullptr, int64_t pointer_array_size = 0ll, int64_t data_buffer_size = 0ll, int64_t scratchpad_size = 0ll);
+    Lock_logger(const char* prelude_string = nullptr, int64_t pointer_array_size = 0ll, int64_t data_buffer_size = 0ll, int64_t scratchpad_size = 0ll);
 
     // destructor
     ~Lock_logger();
