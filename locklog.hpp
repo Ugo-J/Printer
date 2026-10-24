@@ -1,10 +1,10 @@
 #pragma once
 
-#include "printer_headers.hpp"
-#include "printer_structure.hpp"
+#include "locklog_headers.hpp"
+#include "locklog_structure.hpp"
 
 // constructor
-Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_buffer_size, int64_t scratchpad_size){
+Lock_logger::Lock_logger(char* prelude_string, int64_t pointer_array_size, int64_t data_buffer_size, int64_t scratchpad_size){
 
     // we allocate and store our prelude if not null
     if(prelude_string != nullptr){
@@ -141,7 +141,7 @@ Printer::Printer(char* prelude_string, int64_t pointer_array_size, int64_t data_
 }
 
 // destructor
-Printer::~Printer(){
+Lock_logger::~Lock_logger(){
 
     // we write to screen any unwritten data in the scratchpad if we have data other than the prelude in the scratchpad
     if(scratchpad_cursor - scratchpad > prelude_len) write_to_screen();
@@ -160,7 +160,7 @@ Printer::~Printer(){
 
 }
 
-void Printer::flush(){
+void Lock_logger::flush(){
 // the flush function simply sets the atomic variable write_index to the value of the non atomic variable p_array_index so everything written since the last call to flush becomes visible to every other thread
 
     // we use the release memory order to ensure that all writes to the internal buffer and pointer array are visible to other threads before the write_index is updated
@@ -168,7 +168,7 @@ void Printer::flush(){
 
 }
 
-void Printer::write_to_screen(){
+void Lock_logger::write_to_screen(){
 
     if(!error){
 
@@ -208,7 +208,7 @@ void Printer::write_to_screen(){
 
 }
 
-void Printer::print(){
+void Lock_logger::print(){
 // the print function simply writes anything written to the internal buffer that hasn't been printed yet to our scratchpad
 
     // only continue if no error
@@ -450,7 +450,7 @@ void Printer::print(){
 
 }
 
-Printer& Printer::print_shift(const char* data){
+Lock_logger& Lock_logger::print_shift(const char* data){
 // print_shift function for printshifting strings
 
     // only continue if no error
@@ -554,7 +554,7 @@ Printer& Printer::print_shift(const char* data){
 
 }
 
-Printer& Printer::print_shift(int x){
+Lock_logger& Lock_logger::print_shift(int x){
 // function for printshifting integers
 
     // only continue if no error
@@ -595,7 +595,7 @@ Printer& Printer::print_shift(int x){
 
 }
 
-Printer& Printer::print_shift(unsigned int x){
+Lock_logger& Lock_logger::print_shift(unsigned int x){
 // function for printshifting integers
 
     // only continue if no error
@@ -636,7 +636,7 @@ Printer& Printer::print_shift(unsigned int x){
 
 }
 
-Printer& Printer::print_shift(int64_t x){
+Lock_logger& Lock_logger::print_shift(int64_t x){
 // function for printshifting integers
 
     // only continue if no error
@@ -677,7 +677,7 @@ Printer& Printer::print_shift(int64_t x){
 
 }
 
-Printer& Printer::print_shift(uint64_t x){
+Lock_logger& Lock_logger::print_shift(uint64_t x){
 // function for printshifting integers
 
     // only continue if no error
@@ -718,7 +718,7 @@ Printer& Printer::print_shift(uint64_t x){
 
 }
 
-Printer& Printer::print_shift(double x){
+Lock_logger& Lock_logger::print_shift(double x){
 // function for printshifting integers
 
     // only continue if no error
@@ -759,7 +759,7 @@ Printer& Printer::print_shift(double x){
 
 }
 
-Printer& Printer::print_shift(EndlTag endl_tag){
+Lock_logger& Lock_logger::print_shift(EndlTag endl_tag){
 
     // only continue if no error
     if(!error){
@@ -800,7 +800,7 @@ Printer& Printer::print_shift(EndlTag endl_tag){
 
 }
 
-Printer& Printer::operator<<(const char* data){
+Lock_logger& Lock_logger::operator<<(const char* data){
 // operator<< function for printshifting strings
 
     // only continue if no error
@@ -904,7 +904,7 @@ Printer& Printer::operator<<(const char* data){
 
 }
 
-Printer& Printer::operator<<(int x){
+Lock_logger& Lock_logger::operator<<(int x){
 // operator<< function for printshifting integers
 
     // only continue if no error
@@ -945,7 +945,7 @@ Printer& Printer::operator<<(int x){
 
 }
 
-Printer& Printer::operator<<(unsigned int x){
+Lock_logger& Lock_logger::operator<<(unsigned int x){
 // operator<< function for printshifting integers
 
     // only continue if no error
@@ -986,7 +986,7 @@ Printer& Printer::operator<<(unsigned int x){
 
 }
 
-Printer& Printer::operator<<(int64_t x){
+Lock_logger& Lock_logger::operator<<(int64_t x){
 // operator<< function for printshifting integers
 
     // only continue if no error
@@ -1027,7 +1027,7 @@ Printer& Printer::operator<<(int64_t x){
 
 }
 
-Printer& Printer::operator<<(uint64_t x){
+Lock_logger& Lock_logger::operator<<(uint64_t x){
 // operator<< function for printshifting integers
 
     // only continue if no error
@@ -1068,7 +1068,7 @@ Printer& Printer::operator<<(uint64_t x){
 
 }
 
-Printer& Printer::operator<<(double x){
+Lock_logger& Lock_logger::operator<<(double x){
 // operator<< function for printshifting integers
 
     // only continue if no error
@@ -1109,7 +1109,7 @@ Printer& Printer::operator<<(double x){
 
 }
 
-Printer& Printer::operator<<(EndlTag endl_tag){
+Lock_logger& Lock_logger::operator<<(EndlTag endl_tag){
 
     // only continue if no error
     if(!error){

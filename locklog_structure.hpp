@@ -1,17 +1,17 @@
 #pragma once
 
 // we now define the printing class
-class Printer{
+class Lock_logger{
 
 public:
 
     // constructor
-    Printer(char* prelude_string = nullptr, int64_t pointer_array_size = 0ll, int64_t data_buffer_size = 0ll, int64_t scratchpad_size = 0ll);
+    Lock_logger(char* prelude_string = nullptr, int64_t pointer_array_size = 0ll, int64_t data_buffer_size = 0ll, int64_t scratchpad_size = 0ll);
 
     // destructor
-    ~Printer();
+    ~Lock_logger();
 
-    // we define the Printer endl tag
+    // we define the Lock_logger endl tag
     static constexpr struct EndlTag {} endl{};
 
 private:
@@ -82,10 +82,10 @@ private:
     // we declare a pointer to point to the end of the scratchpad
     char* end_of_scratchpad = nullptr;
 
-    // prelude string pointer - the prelude is the text printed before the print shifted data in the printer buffer, it can be used to differentiate data from different printers
+    // prelude string pointer - the prelude is the text printed before the print shifted data in the Lock_logger buffer, it can be used to differentiate data from different Lock_loggers
     char* prelude = nullptr;
 
-    // prelude string length - this is computed if the printer class is constructed with a prelude string
+    // prelude string length - this is computed if the Lock_logger class is constructed with a prelude string
     ssize_t prelude_len = 0;
 
     // counter used to keep track of written bytes in the data buffer
@@ -131,59 +131,59 @@ public:
     // the print function is used to print all print shifted data
     void print();
 
-    // the free print function is used to print print shifted data from any number of printer objects
-    template <typename... Printer>
-    static void print_many(Printer&... p){ (p.print(), ...); }
+    // the free print function is used to print print shifted data from any number of Lock_logger objects
+    template <typename... Lock_logger>
+    static void print_many(Lock_logger&... p){ (p.print(), ...); }
 
 public:
 
     // print shift functions
 
     // char* print shift function
-    Printer& print_shift(const char* data);
+    Lock_logger& print_shift(const char* data);
 
     // int print shift function
-    Printer& print_shift(int x);
+    Lock_logger& print_shift(int x);
 
     // unsigned int print shift function
-    Printer& print_shift(unsigned int x);
+    Lock_logger& print_shift(unsigned int x);
 
     // int64 print shift function
-    Printer& print_shift(int64_t x);
+    Lock_logger& print_shift(int64_t x);
 
     // uint64 print shift function
-    Printer& print_shift(uint64_t x);
+    Lock_logger& print_shift(uint64_t x);
 
     // double print shift function
-    Printer& print_shift(double x);
+    Lock_logger& print_shift(double x);
 
     // endl print shift function
-    Printer& print_shift(EndlTag endl_tag);
+    Lock_logger& print_shift(EndlTag endl_tag);
 
 public:
 
     // print shift operator<< functions
 
     // char* print shift operator<< function
-    Printer& operator<<(const char* data);
+    Lock_logger& operator<<(const char* data);
 
     // int print shift operator<< function
-    Printer& operator<<(int x);
+    Lock_logger& operator<<(int x);
 
     // unsigned int print shift operator<< function
-    Printer& operator<<(unsigned int x);
+    Lock_logger& operator<<(unsigned int x);
 
     // int64 print shift operator<< function
-    Printer& operator<<(int64_t x);
+    Lock_logger& operator<<(int64_t x);
 
     // uint64 print shift operator<< function
-    Printer& operator<<(uint64_t x);
+    Lock_logger& operator<<(uint64_t x);
 
     // double print shift operator<< function
-    Printer& operator<<(double x);
+    Lock_logger& operator<<(double x);
 
     // endl print shift operator<< function
-    Printer& operator<<(EndlTag endl_tag);
+    Lock_logger& operator<<(EndlTag endl_tag);
 
 };
 
