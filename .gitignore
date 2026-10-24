@@ -4,3 +4,4 @@ a.out
 Makefile
 compressedLog
 nanolog_output.log
+locklog.cpp
